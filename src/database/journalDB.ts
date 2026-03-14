@@ -1,42 +1,78 @@
+/**
+ * journalDB.ts — Database abstraction layer.
+ * Routes to SQLite on native, webDataStore on web.
+ */
 import { Platform } from 'react-native';
 import { JournalEntry } from '../types';
+import { webStore } from './webDataStore';
 
 const SQLite = Platform.OS !== 'web' ? require('expo-sqlite') : null;
 
+// ─── Helper: parse DB/web row into typed JournalEntry ────────
+const parseEntryRow = (row: any): JournalEntry => {
+  return {
+    ...row,
+    id: String(row.id),
+    wordCount: row.word_count ?? row.wordCount ?? 0,
+    detectedEmotions: typeof row.detected_emotions === 'string'
+      ? JSON.parse(row.detected_emotions)
+      : (row.detectedEmotions || []),
+    dominantEmotion: typeof row.dominant_emotion === 'string'
+      ? JSON.parse(row.dominant_emotion)
+      : (row.dominantEmotion || null),
+    tags: typeof row.tags === 'string'
+      ? JSON.parse(row.tags)
+      : (row.tags || []),
+    linguisticScore: typeof row.linguistic_score === 'string'
+      ? JSON.parse(row.linguistic_score)
+      : (row.linguisticScore || null),
+    moodScore: row.mood_score ?? row.moodScore ?? null,
+    promptUsed: row.prompt_used ?? row.promptUsed ?? null,
+    date: row.date,
+    content: row.content || '',
+  };
+};
+
+// ─── INSERT ─────────────────────────────────────────────────
 export const insertEntry = async (
   db: any,
   entry: Partial<JournalEntry>
 ): Promise<number> => {
-  if (Platform.OS === 'web' || !db) return 0;
-  try {
-    const now = new Date().toISOString();
-    
-    // Convert object fields to JSON strings for SQLite
-    const detectedEmotionsStr = entry.detectedEmotions ? JSON.stringify(entry.detectedEmotions) : null;
-    const dominantEmotionStr = entry.dominantEmotion ? JSON.stringify(entry.dominantEmotion) : null;
-    const tagsStr = entry.tags ? JSON.stringify(entry.tags) : null;
-    const linguisticScoreStr = entry.linguisticScore ? JSON.stringify(entry.linguisticScore) : null;
+  const now = new Date().toISOString();
+  const detectedEmotionsStr = entry.detectedEmotions ? JSON.stringify(entry.detectedEmotions) : null;
+  const dominantEmotionStr = entry.dominantEmotion ? JSON.stringify(entry.dominantEmotion) : null;
+  const tagsStr = entry.tags ? JSON.stringify(entry.tags) : null;
+  const linguisticScoreStr = entry.linguisticScore ? JSON.stringify(entry.linguisticScore) : null;
 
+  if (Platform.OS === 'web') {
+    return webStore.insertEntry({
+      date: entry.date || now.split('T')[0],
+      created_at: now,
+      content: entry.content || '',
+      word_count: entry.wordCount || 0,
+      detected_emotions: detectedEmotionsStr,
+      dominant_emotion: dominantEmotionStr,
+      tags: tagsStr,
+      mood_score: entry.moodScore || null,
+      prompt_used: entry.promptUsed || null,
+      linguistic_score: linguisticScoreStr,
+    });
+  }
+
+  if (!db) return 0;
+  try {
     const result = await db.runAsync(
       `INSERT INTO journal_entries (
-        date, created_at, content, word_count, 
-        detected_emotions, dominant_emotion, tags, 
+        date, created_at, content, word_count,
+        detected_emotions, dominant_emotion, tags,
         mood_score, prompt_used, linguistic_score
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        entry.date || now.split('T')[0],
-        now,
-        entry.content || '',
-        entry.wordCount || 0,
-        detectedEmotionsStr,
-        dominantEmotionStr,
-        tagsStr,
-        entry.moodScore || null,
-        entry.promptUsed || null,
-        linguisticScoreStr
+        entry.date || now.split('T')[0], now, entry.content || '', entry.wordCount || 0,
+        detectedEmotionsStr, dominantEmotionStr, tagsStr,
+        entry.moodScore || null, entry.promptUsed || null, linguisticScoreStr
       ]
     );
-    
     return result.lastInsertRowId;
   } catch (error) {
     console.error('❌ Error inserting journal entry:', error);
@@ -44,78 +80,71 @@ export const insertEntry = async (
   }
 };
 
+// ─── UPDATE ─────────────────────────────────────────────────
 export const updateEntry = async (
-  db: any,
-  id: number,
-  updates: Partial<JournalEntry>
+  db: any, id: number, updates: Partial<JournalEntry>
 ): Promise<void> => {
-  if (Platform.OS === 'web' || !db) return;
+  if (Platform.OS === 'web') {
+    const webUpdates: any = {};
+    if (updates.content !== undefined) webUpdates.content = updates.content;
+    if (updates.wordCount !== undefined) webUpdates.word_count = updates.wordCount;
+    if (updates.detectedEmotions) webUpdates.detected_emotions = JSON.stringify(updates.detectedEmotions);
+    if (updates.dominantEmotion) webUpdates.dominant_emotion = JSON.stringify(updates.dominantEmotion);
+    if (updates.tags) webUpdates.tags = JSON.stringify(updates.tags);
+    if (updates.moodScore !== undefined) webUpdates.mood_score = updates.moodScore;
+    webStore.updateEntry(id, webUpdates);
+    return;
+  }
+
+  if (!db) return;
   try {
     const now = new Date().toISOString();
-    
-    // Convert object fields to JSON strings
-    const detectedEmotionsStr = updates.detectedEmotions ? JSON.stringify(updates.detectedEmotions) : undefined;
-    const dominantEmotionStr = updates.dominantEmotion ? JSON.stringify(updates.dominantEmotion) : undefined;
-    const tagsStr = updates.tags ? JSON.stringify(updates.tags) : undefined;
-    const linguisticScoreStr = updates.linguisticScore ? JSON.stringify(updates.linguisticScore) : undefined;
-
-    // Build dynamic update query
-    const fields = [];
-    const values = [];
+    const fields: string[] = [];
+    const values: any[] = [];
 
     if (updates.content !== undefined) { fields.push('content = ?'); values.push(updates.content); }
     if (updates.wordCount !== undefined) { fields.push('word_count = ?'); values.push(updates.wordCount); }
-    if (detectedEmotionsStr !== undefined) { fields.push('detected_emotions = ?'); values.push(detectedEmotionsStr); }
-    if (dominantEmotionStr !== undefined) { fields.push('dominant_emotion = ?'); values.push(dominantEmotionStr); }
-    if (tagsStr !== undefined) { fields.push('tags = ?'); values.push(tagsStr); }
+    if (updates.detectedEmotions) { fields.push('detected_emotions = ?'); values.push(JSON.stringify(updates.detectedEmotions)); }
+    if (updates.dominantEmotion) { fields.push('dominant_emotion = ?'); values.push(JSON.stringify(updates.dominantEmotion)); }
+    if (updates.tags) { fields.push('tags = ?'); values.push(JSON.stringify(updates.tags)); }
     if (updates.moodScore !== undefined) { fields.push('mood_score = ?'); values.push(updates.moodScore); }
-
-    fields.push('updated_at = ?');
-    values.push(now);
-    
-    values.push(id); // for WHERE id = ?
-
-    await db.runAsync(
-      `UPDATE journal_entries SET ${fields.join(', ')} WHERE id = ?`,
-      values
-    );
+    fields.push('updated_at = ?'); values.push(now);
+    values.push(id);
+    await db.runAsync(`UPDATE journal_entries SET ${fields.join(', ')} WHERE id = ?`, values);
   } catch (error) {
     console.error(`❌ Error updating entry ${id}:`, error);
     throw error;
   }
 };
 
-export const getEntryByDate = async (
-  db: any,
-  date: string
-): Promise<JournalEntry | null> => {
-  if (Platform.OS === 'web' || !db) return null;
+// ─── GET BY DATE ────────────────────────────────────────────
+export const getEntryByDate = async (db: any, date: string): Promise<JournalEntry | null> => {
+  if (Platform.OS === 'web') {
+    const row = webStore.getEntryByDate(date);
+    return row ? parseEntryRow(row) : null;
+  }
+  if (!db) return null;
   try {
     const result = await db.getFirstAsync(
-      'SELECT * FROM journal_entries WHERE date = ? ORDER BY created_at DESC LIMIT 1',
-      [date]
+      'SELECT * FROM journal_entries WHERE date = ? ORDER BY created_at DESC LIMIT 1', [date]
     );
-
-    if (!result) return null;
-    return parseEntryRow(result);
+    return result ? parseEntryRow(result) : null;
   } catch (error) {
     console.error(`❌ Error getting entry for date ${date}:`, error);
     throw error;
   }
 };
 
-export const getEntriesByRange = async (
-  db: any,
-  startDate: string,
-  endDate: string
-): Promise<JournalEntry[]> => {
-  if (Platform.OS === 'web' || !db) return [];
+// ─── GET BY RANGE ───────────────────────────────────────────
+export const getEntriesByRange = async (db: any, startDate: string, endDate: string): Promise<JournalEntry[]> => {
+  if (Platform.OS === 'web') {
+    return webStore.getEntriesByRange(startDate, endDate).map(parseEntryRow);
+  }
+  if (!db) return [];
   try {
     const results = await db.getAllAsync(
-      'SELECT * FROM journal_entries WHERE date >= ? AND date <= ? ORDER BY date DESC',
-      [startDate, endDate]
+      'SELECT * FROM journal_entries WHERE date >= ? AND date <= ? ORDER BY date DESC', [startDate, endDate]
     );
-    
     return results.map(parseEntryRow);
   } catch (error) {
     console.error(`❌ Error getting entries from ${startDate} to ${endDate}:`, error);
@@ -123,14 +152,14 @@ export const getEntriesByRange = async (
   }
 };
 
-export const getAllEntries = async (
-  db: any
-): Promise<JournalEntry[]> => {
-  if (Platform.OS === 'web' || !db) return [];
+// ─── GET ALL ────────────────────────────────────────────────
+export const getAllEntries = async (db: any): Promise<JournalEntry[]> => {
+  if (Platform.OS === 'web') {
+    return webStore.getAllEntries().map(parseEntryRow);
+  }
+  if (!db) return [];
   try {
-    const results = await db.getAllAsync(
-      'SELECT * FROM journal_entries ORDER BY date DESC'
-    );
+    const results = await db.getAllAsync('SELECT * FROM journal_entries ORDER BY date DESC');
     return results.map(parseEntryRow);
   } catch (error) {
     console.error('❌ Error getting all entries:', error);
@@ -138,11 +167,13 @@ export const getAllEntries = async (
   }
 };
 
-export const deleteEntry = async (
-  db: any,
-  id: number
-): Promise<void> => {
-  if (Platform.OS === 'web' || !db) return;
+// ─── DELETE ─────────────────────────────────────────────────
+export const deleteEntry = async (db: any, id: number): Promise<void> => {
+  if (Platform.OS === 'web') {
+    webStore.deleteEntry(id);
+    return;
+  }
+  if (!db) return;
   try {
     await db.runAsync('DELETE FROM journal_entries WHERE id = ?', [id]);
   } catch (error) {
@@ -151,12 +182,12 @@ export const deleteEntry = async (
   }
 };
 
+// ─── COUNT ──────────────────────────────────────────────────
 export const getEntryCount = async (db: any): Promise<number> => {
-  if (Platform.OS === 'web' || !db) return 0;
+  if (Platform.OS === 'web') return webStore.getEntryCount();
+  if (!db) return 0;
   try {
-    const result = await db.getFirstAsync(
-      'SELECT COUNT(*) as count FROM journal_entries'
-    );
+    const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM journal_entries');
     return result?.count || 0;
   } catch (error) {
     console.error('❌ Error getting entry count:', error);
@@ -164,15 +195,12 @@ export const getEntryCount = async (db: any): Promise<number> => {
   }
 };
 
+// ─── STREAK ─────────────────────────────────────────────────
 export const getStreakCount = async (db: any): Promise<number> => {
-  if (Platform.OS === 'web' || !db) return 0;
+  if (Platform.OS === 'web') return webStore.getStreakCount();
+  if (!db) return 0;
   try {
-    // A simplified streak calculation logic: fetch all distinct dates in descending order
-    // and count consecutive days backwards from today or yesterday
-    const results = await db.getAllAsync(
-      'SELECT DISTINCT date FROM journal_entries ORDER BY date DESC'
-    );
-    
+    const results = await db.getAllAsync('SELECT DISTINCT date FROM journal_entries ORDER BY date DESC');
     if (results.length === 0) return 0;
 
     const today = new Date().toISOString().split('T')[0];
@@ -180,33 +208,22 @@ export const getStreakCount = async (db: any): Promise<number> => {
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
     const yesterday = yesterdayDate.toISOString().split('T')[0];
 
-    // Array of dates ["2026-03-09", "2026-03-08", etc]
     const dates = results.map((row: any) => row.date);
-    
     let streak = 0;
     let currentDate = new Date();
 
-    // Check if there's an entry today or yesterday to even start a streak
-    if (!dates.includes(today) && !dates.includes(yesterday)) {
-      return 0; // Streak broken
-    }
-    
-    // Set starting point to verify backward
-    if (!dates.includes(today)) {
-      currentDate.setDate(currentDate.getDate() - 1); // start checking from yesterday
-    }
+    if (!dates.includes(today) && !dates.includes(yesterday)) return 0;
+    if (!dates.includes(today)) currentDate.setDate(currentDate.getDate() - 1);
 
     for (let i = 0; i < dates.length; i++) {
       const checkDateStr = currentDate.toISOString().split('T')[0];
-      
       if (dates.includes(checkDateStr)) {
         streak++;
-        currentDate.setDate(currentDate.getDate() - 1); // go back one day
+        currentDate.setDate(currentDate.getDate() - 1);
       } else {
-        break; // gap found
+        break;
       }
     }
-
     return streak;
   } catch (error) {
     console.error('❌ Error calculating streak:', error);
@@ -214,13 +231,20 @@ export const getStreakCount = async (db: any): Promise<number> => {
   }
 };
 
-// Helper to parse DB row into proper JS objects
-const parseEntryRow = (row: any): JournalEntry => {
-  return {
-    ...row,
-    detectedEmotions: row.detected_emotions ? JSON.parse(row.detected_emotions) : [],
-    dominantEmotion: row.dominant_emotion ? JSON.parse(row.dominant_emotion) : null,
-    tags: row.tags ? JSON.parse(row.tags) : [],
-    linguisticScore: row.linguistic_score ? JSON.parse(row.linguistic_score) : null,
-  };
+// ─── GET LATEST ENTRY ───────────────────────────────────────
+export const getLatestEntry = async (db: any): Promise<JournalEntry | null> => {
+  if (Platform.OS === 'web') {
+    const row = webStore.getLatestEntry();
+    return row ? parseEntryRow(row) : null;
+  }
+  if (!db) return null;
+  try {
+    const result = await db.getFirstAsync(
+      'SELECT * FROM journal_entries ORDER BY created_at DESC LIMIT 1'
+    );
+    return result ? parseEntryRow(result) : null;
+  } catch (error) {
+    console.error('❌ Error getting latest entry:', error);
+    return null;
+  }
 };

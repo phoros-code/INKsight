@@ -1,32 +1,39 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Dimensions } from 'react-native';
+/**
+ * FloatingTabBar — Stitch: settings_premium_glassmorphism tab bar.
+ * Dark pill (ink-dark/95), 5 tabs, center FAB with teal bg.
+ */
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, Platform } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { Colors } from '../../constants/colors';
 
-const { width } = Dimensions.get('window');
-
-// Map route names to Feather icons
-const ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  index: 'home',
-  journal: 'edit-3',
-  insights: 'bar-chart-2',
-  settings: 'settings',
+// Tab config: name → icon
+const TAB_CONFIG: Record<string, { icon: string; label: string }> = {
+  index: { icon: 'home', label: 'Home' },
+  insights: { icon: 'bar-chart-2', label: 'Insights' },
+  journal: { icon: 'plus', label: '' }, // Center FAB
+  flow: { icon: 'trending-up', label: 'Flow' },
+  settings: { icon: 'settings', label: 'Settings' },
 };
+
+// Tab display order
+const TAB_ORDER = ['index', 'insights', 'journal', 'flow', 'settings'];
 
 export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   return (
-    <View style={styles.container}>
-      <View style={styles.tabBar}>
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
-          const iconName = ICONS[route.name] || 'circle';
+    <View style={styles.wrapper}>
+      <View style={styles.container}>
+        {TAB_ORDER.map((tabName, idx) => {
+          // Find the matching route
+          const routeIndex = state.routes.findIndex(r => r.name === tabName);
+          if (routeIndex < 0) return null;
+
+          const route = state.routes[routeIndex];
+          const config = TAB_CONFIG[tabName] || { icon: 'circle', label: tabName };
+          const isFocused = state.index === routeIndex;
+          const isFAB = tabName === 'journal';
 
           const onPress = () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
@@ -38,23 +45,32 @@ export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarP
             }
           };
 
+          if (isFAB) {
+            // Stitch: w-12 h-12 bg-primary rounded-full -mt-8 border-4 border-background-light
+            return (
+              <TouchableOpacity
+                key={tabName}
+                onPress={onPress}
+                style={styles.fabBtn}
+                activeOpacity={0.85}
+              >
+                <Feather name="plus" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            );
+          }
+
           return (
             <TouchableOpacity
-              key={route.key}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel}
-              testID={options.tabBarTestID}
+              key={tabName}
               onPress={onPress}
-              style={styles.tabItem}
+              style={styles.tabBtn}
+              activeOpacity={0.7}
             >
-              <View style={[styles.iconWrapper, isFocused && styles.activeIconWrapper]}>
-                <Feather
-                  name={iconName}
-                  size={24}
-                  color={isFocused ? Colors.primary : '#A0ADB8'}
-                />
-              </View>
+              <Feather
+                name={config.icon as any}
+                size={24}
+                color={isFocused ? '#FFFFFF' : 'rgba(255,255,255,0.5)'}
+              />
             </TouchableOpacity>
           );
         })}
@@ -64,38 +80,54 @@ export const FloatingTabBar = ({ state, descriptors, navigation }: BottomTabBarP
 };
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     position: 'absolute',
     bottom: 24,
-    alignSelf: 'center',
-    width: width * 0.8,
-  },
-  tabBar: {
-    flexDirection: 'row',
-    height: 64,
-    backgroundColor: Colors.cardBg,
-    borderRadius: 40,
-    justifyContent: 'space-around',
+    left: '5%' as any,
+    right: '5%' as any,
     alignItems: 'center',
+    ...(Platform.OS === 'web' ? { position: 'fixed' as any, zIndex: 9990 } : {}),
+  },
+  // Stitch: bg-ink-dark/95 backdrop-blur-md rounded-full px-6 py-3
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(44, 62, 80, 0.95)',
+    borderRadius: 9999,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    width: '100%' as any,
+    maxWidth: 400,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
+  tabBtn: {
+    width: 44,
+    height: 44,
     justifyContent: 'center',
-  },
-  iconWrapper: {
-    width: 40,
-    height: 32,
-    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  activeIconWrapper: {
-    backgroundColor: Colors.softBlue,
+  // Stitch: w-12 h-12 bg-primary rounded-full -mt-8 shadow-lg border-4 border-background-light
+  fabBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#7DBFA7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: -32,
+    borderWidth: 4,
+    borderColor: '#F5F2EE',
+    shadowColor: '#7DBFA7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

@@ -12,8 +12,8 @@ import { Colors } from '../../src/constants/colors';
 // Platform-safe imports
 let useSQLiteContext: any = () => ({ runAsync: async () => {}, getFirstAsync: async () => null, execAsync: async () => {} });
 let MMKV: any = null;
-let Haptics: any = { selectionAsync: () => {}, notificationAsync: () => {}, NotificationFeedbackType: { Success: 0, Warning: 1 } };
-let Sharing: any = { shareAsync: async () => {} };
+let Haptics: any = { selectionAsync: () => {}, notificationAsync: () => {}, impactAsync: () => {}, NotificationFeedbackType: { Success: 0, Warning: 1 }, ImpactFeedbackStyle: { Medium: 0 } };
+let Sharing: any = { shareAsync: async () => {}, isAvailableAsync: async () => false };
 let FileSystem: any = { documentDirectory: '', writeAsStringAsync: async () => {} };
 let LocalAuthentication: any = {};
 let getStreakCount: any = async () => 0;
@@ -37,7 +37,7 @@ const storage = MMKV ? new MMKV() : {
   set: (k: string, v: any) => {},
 };
 
-export default function SettingsScreen() {
+export default function ProfileScreen() {
   const router = useRouter();
   const db = Platform.OS !== 'web' ? useSQLiteContext() : null;
   
@@ -48,7 +48,7 @@ export default function SettingsScreen() {
   
   // Toggles
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [offlineMode, setOfflineMode] = useState(true); // Default true per spec
+  const [offlineMode, setOfflineMode] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
@@ -88,8 +88,6 @@ export default function SettingsScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  // --- Toggle Handlers ---
-
   const toggleBiometric = async (value: boolean) => {
     if (value) {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -122,8 +120,6 @@ export default function SettingsScreen() {
       Alert.alert('Warning', 'INKsight is designed to be privacy-first. We recommend keeping offline mode ON.');
     }
   };
-
-  // --- Actions ---
 
   const handleExportData = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -165,28 +161,15 @@ export default function SettingsScreen() {
         { 
           text: 'Delete', 
           style: 'destructive',
-          onPress: () => {
-            Alert.prompt('Confirm Deletion', 'Type DELETE to confirm', [
-               { text: 'Cancel', style: 'cancel' },
-               {
-                 text: 'Confirm',
-                 style: 'destructive',
-                 onPress: async (text: string | undefined) => {
-                    if (text === 'DELETE') {
-                      try {
-                        await db.execAsync('DELETE FROM journal_entries; DELETE FROM daily_checkins; DELETE FROM pattern_insights;');
-                        loadStats();
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        Alert.alert('Data Erased', 'Your journal is completely clear.');
-                      } catch(e) {
-                        console.error('Del err', e);
-                      }
-                    } else {
-                      Alert.alert('Cancelled', 'You did not type DELETE. Your data is safe.');
-                    }
-                 }
-               }
-            ]);
+          onPress: async () => {
+            try {
+              await db.execAsync('DELETE FROM journal_entries; DELETE FROM daily_checkins; DELETE FROM pattern_insights;');
+              loadStats();
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert('Data Erased', 'Your journal is completely clear.');
+            } catch(e) {
+              console.error('Del err', e);
+            }
           }
         }
       ]
@@ -218,12 +201,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Text style={[styles.pageTitle, { marginBottom: 0 }]}>Settings</Text>
-        <TouchableOpacity onPress={() => router.push('/modals/safe-space')}>
-           <Feather name="heart" size={24} color="#A0ADB8" />
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.pageTitle}>Profile</Text>
 
       {/* PROFILE CARD */}
       <View style={styles.profileCard}>
@@ -383,7 +361,7 @@ export default function SettingsScreen() {
         </View>
       </View>
 
-      <Text style={styles.footerText}>INKsight Premium v2.4.1 · Made with care for your mind.</Text>
+      <Text style={styles.footerText}>INKsight v1.0.0 · Made with 💙</Text>
 
     </ScrollView>
   );
@@ -397,12 +375,12 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   pageTitle: {
     fontFamily: 'Nunito_700Bold',
-    fontSize: 24,
-    color: '#2C3E50',
+    fontSize: 28,
+    color: Colors.textPrimary,
     marginBottom: 20,
   },
   profileCard: {
@@ -467,31 +445,30 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 11,
     color: '#A0ADB8',
     letterSpacing: 1.5,
-    marginBottom: 12,
-    paddingHorizontal: 4,
-    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginLeft: 10,
   },
   sectionBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 30,
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
     elevation: 3,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 52,
+    paddingHorizontal: 16,
+    height: 54,
   },
   rowLeft: {
     flexDirection: 'row',
@@ -506,7 +483,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   rowText: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Nunito_400Regular',
     fontSize: 15,
     color: '#2C3E50',
   },
@@ -522,7 +499,7 @@ const styles = StyleSheet.create({
   },
   crisisCard: {
     flexDirection: 'row',
-    backgroundColor: '#EBF2F9', // Fallback, would be nice with gradient
+    backgroundColor: '#EBF2F9',
     borderRadius: 20,
     marginTop: 10,
     marginBottom: 30,
@@ -559,6 +536,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#A0ADB8',
     textAlign: 'center',
-    marginBottom: 20,
   },
 });

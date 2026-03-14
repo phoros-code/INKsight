@@ -6,9 +6,10 @@ interface EmotionPillProps {
   color: string;
 }
 
+// Stitch: rounded-full bg-primary/10 px-3 py-0.5 font-nunito text-[12px] font-semibold
 export const EmotionPill: React.FC<EmotionPillProps> = ({ emotion, color }) => {
   return (
-    <View style={[styles.container, { backgroundColor: `${color}20` }]}>
+    <View style={[styles.container, { backgroundColor: `${color}18` }]}>
       <Text style={[styles.text, { color }]}>{emotion}</Text>
     </View>
   );
@@ -16,14 +17,14 @@ export const EmotionPill: React.FC<EmotionPillProps> = ({ emotion, color }) => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 9999,
+    marginRight: 8,
+    marginBottom: 4,
   },
   text: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 12,
   },
 });

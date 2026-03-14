@@ -64,7 +64,7 @@ export default function SafeSpaceModal() {
     } else {
        cancelAnimation(scale);
        scale.value = withTiming(1);
-       setBreatheText('Tap to start breathing guide');
+       setBreatheText('Start Breathing');
     }
 
     return () => {
@@ -144,8 +144,8 @@ export default function SafeSpaceModal() {
                    <Feather name="phone" size={18} color={Colors.secondary} />
                 </View>
                 <View style={styles.optionTextContainer}>
-                   <Text style={styles.optionTitle}>iCall India</Text>
-                   <Text style={styles.optionSub}>9152987821 · Free · Confidential</Text>
+                   <Text style={styles.optionTitle}>iCall India Helpline</Text>
+                   <Text style={styles.optionSub}>Professional counseling support</Text>
                 </View>
              </View>
              <View style={[styles.actionPill, { backgroundColor: Colors.secondary }]}>
@@ -193,7 +193,7 @@ export default function SafeSpaceModal() {
         <View style={styles.footer}>
            <TouchableOpacity 
              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.back();
              }}
              style={styles.closeBtn}

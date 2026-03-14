@@ -9,15 +9,15 @@ export default function TabLayout() {
       tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        // Slide transitions are built into Stack normally, 
-        // for Tabs we can apply animation on tab press if desired, 
-        // but typically tabs just switch instantly or crossfade.
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
-      <Tabs.Screen name="journal" options={{ title: 'Journal' }} />
       <Tabs.Screen name="insights" options={{ title: 'Insights' }} />
+      <Tabs.Screen name="journal" options={{ title: 'Journal' }} />
+      <Tabs.Screen name="flow" options={{ title: 'Flow' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
+      {/* Profile hidden — Settings is the main profile/settings screen */}
+      <Tabs.Screen name="profile" options={{ title: 'Profile', href: null }} />
     </Tabs>
   );
 }

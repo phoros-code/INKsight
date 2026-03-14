@@ -13,6 +13,7 @@ import { generateWeeklyPatterns } from '../../src/services/patternEngine';
 
 import { EmotionLineChart } from '../../src/components/insights/EmotionLineChart';
 import { PatternCard } from '../../src/components/insights/PatternCard';
+import { EmotionRadarChart } from '../../src/components/insights/RadarChart';
 
 type PeriodRange = '7' | '30' | '90';
 
@@ -188,10 +189,14 @@ export default function InsightsDashboard() {
       showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
     >
-      <View style={[styles.header, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-        <Text style={styles.headerTitle}>Insights</Text>
-        <TouchableOpacity onPress={() => router.push('/modals/safe-space')}>
-           <Feather name="heart" size={24} color="#A0ADB8" />
+      {/* HEADER — Stitch: back arrow ← "Your Patterns" → share */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+          <Feather name="arrow-left" size={24} color={Colors.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Your Patterns</Text>
+        <TouchableOpacity onPress={() => {}}>
+          <Feather name="share" size={20} color={Colors.textPrimary} />
         </TouchableOpacity>
       </View>
 
@@ -240,22 +245,42 @@ export default function InsightsDashboard() {
         )}
       </View>
 
-      {/* TOP EMOTIONS ROW */}
+      {/* EMOTION RADAR CHART — Stitch: Emotion Mix */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Emotion Mix</Text>
+        <EmotionRadarChart data={
+          topEmotions.length >= 3 
+            ? topEmotions.map(em => ({ label: em.emotion.toUpperCase(), value: em.percentage }))
+            : []
+        } />
+      </View>
+
+      {/* TOP 3 EMOTIONS — Stitch: emoji + percentage + trend */}
       {topEmotions.length > 0 && (
         <View style={styles.emotionsRow}>
-          {topEmotions.map((em, idx) => (
-            <View key={idx} style={styles.emotionSquare}>
-              <Text style={styles.emotionSquareName}>{em.emotion}</Text>
-              <Text style={[styles.emotionSquarePercent, { color: em.color }]}>{em.percentage}%</Text>
-            </View>
-          ))}
+          {topEmotions.map((em, idx) => {
+            const emojis = ['\u{1F33F}', '\u2728', '\u{1F64F}']; // 🌿 ✨ 🙏
+            const trendColors = [Colors.secondary, Colors.primary, '#E07A5F'];
+            return (
+              <View key={idx} style={styles.emotionSquare}>
+                <Text style={styles.emotionEmoji}>{emojis[idx] || '\u{1F33F}'}</Text>
+                <View style={styles.emotionSquareContent}>
+                  <Text style={styles.emotionSquareName}>{em.emotion}</Text>
+                  <Text style={[styles.emotionSquarePercent, { color: em.color || Colors.textPrimary }]}>{em.percentage}%</Text>
+                </View>
+                <View style={styles.emotionTrend}>
+                  <Feather name={idx < 2 ? 'trending-up' : 'trending-down'} size={14} color={trendColors[idx]} />
+                </View>
+              </View>
+            );
+          })}
         </View>
       )}
 
-      {/* AI PATTERN INSIGHTS LIST */}
+      {/* AI PATTERN INSIGHTS LIST — Stitch: "AI Pattern Insights" */}
       {patterns.length > 0 && (
         <View style={styles.patternsSection}>
-          <Text style={styles.sectionTitle}>AI Observations</Text>
+          <Text style={styles.patternsSectionTitle}>AI Pattern Insights</Text>
           {patterns.map((param, idx) => (
             <PatternCard key={idx} insight={param} />
           ))}
@@ -321,31 +346,46 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
+  },
+  headerBackBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontFamily: 'Nunito_700Bold',
-    fontSize: 28,
+    fontSize: 24,
     color: Colors.textPrimary,
   },
   periodSelector: {
     flexDirection: 'row',
-    marginBottom: 24,
-    gap: 8,
+    marginBottom: 32,
+    gap: 12,
   },
   periodBtn: {
     flex: 1,
     backgroundColor: '#EBF0F4',
-    height: 38,
-    borderRadius: 20,
+    height: 40,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   periodBtnActive: {
     backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   periodBtnText: {
-    fontFamily: 'Nunito_600SemiBold',
+    fontFamily: 'Nunito_700Bold',
     fontSize: 14,
     color: '#7F8C8D',
   },
@@ -374,22 +414,26 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  // Stitch: bg-white rounded-2xl p-6 shadow-sm border border-black/5
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 15,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 2,
   },
+  // Stitch: font-nunito font-semibold text-base
   cardTitle: {
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 16,
     color: Colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 16,
   },
   cardSubtitle: {
     fontFamily: 'Lora_400Regular_Italic',
@@ -409,42 +453,52 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  // Stitch: Top 3 Emotions as individual cards with emoji+data+trend
   emotionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 16,
     marginBottom: 24,
   },
   emotionSquare: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    marginHorizontal: 4,
+    padding: 16,
+    gap: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 8,
     elevation: 2,
   },
+  emotionEmoji: {
+    fontSize: 30,
+  },
+  emotionSquareContent: {
+    flex: 1,
+  },
   emotionSquareName: {
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 13,
-    color: Colors.textPrimary,
-    marginBottom: 8,
+    color: Colors.textSecondary,
     textTransform: 'capitalize',
   },
   emotionSquarePercent: {
     fontFamily: 'Inter_700Bold',
     fontSize: 18,
   },
+  emotionTrend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   patternsSection: {
     marginBottom: 8,
   },
-  sectionTitle: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 18,
+  patternsSectionTitle: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 16,
     color: Colors.textPrimary,
     marginBottom: 16,
   },

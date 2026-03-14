@@ -74,6 +74,7 @@ export default function EmotionWheelModal() {
       
       {/* HEADER */}
       <View style={styles.header}>
+        <Text style={styles.brandText}>INKsight</Text>
         <Text style={styles.title}>What are you feeling?</Text>
         <Text style={styles.subtitle}>Tap the emotion that feels closest. Then go deeper.</Text>
       </View>
@@ -150,6 +151,13 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: '#FFFFFF',
     marginBottom: 8,
+  },
+  brandText: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 14,
+    color: Colors.primary,
+    letterSpacing: 2,
+    marginBottom: 12,
   },
   subtitle: {
     fontFamily: 'Lora_400Regular_Italic',

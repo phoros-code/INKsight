@@ -1,6 +1,9 @@
+/**
+ * MoodOrb — Stitch: orb-gradient radial-gradient(circle at 30% 30%, #a5b4fc, #818cf8)
+ * Animated pulsing mood orb with dynamic color based on emotion.
+ */
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Defs, RadialGradient, Stop, Circle } from 'react-native-svg';
+import { View, StyleSheet, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -10,14 +13,27 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 
-interface MoodOrbProps {
+export interface MoodOrbProps {
   size: number;
-  color: string;
+  emotion?: string;
+  color?: string;
 }
 
-const AnimatedSvg = Animated.createAnimatedComponent(Svg);
+// Map emotion names to orb colors (Stitch uses purple/indigo for the orb)
+const EMOTION_ORB_COLORS: Record<string, [string, string]> = {
+  anxious: ['#89ABD4', '#5B8DB8'],
+  overwhelmed: ['#A0B2C6', '#89ABD4'],
+  tired: ['#D4CFC9', '#A0B2C6'],
+  content: ['#a5b4fc', '#818cf8'], // Stitch default
+  hopeful: ['#7DBFA7', '#5B8DB8'],
+  peaceful: ['#a5b4fc', '#7DBFA7'],
+  joyful: ['#F5D769', '#E6A87C'],
+  curious: ['#E6A87C', '#D4956A'],
+  uncertain: ['#D4CFC9', '#A0B2C6'],
+  default: ['#a5b4fc', '#818cf8'], // Stitch orb-gradient default
+};
 
-export const MoodOrb: React.FC<MoodOrbProps> = ({ size, color }) => {
+export const MoodOrb: React.FC<MoodOrbProps> = ({ size, emotion, color }) => {
   const scale = useSharedValue(1);
 
   useEffect(() => {
@@ -31,32 +47,37 @@ export const MoodOrb: React.FC<MoodOrbProps> = ({ size, color }) => {
     );
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
+  const colors = emotion ? (EMOTION_ORB_COLORS[emotion] || EMOTION_ORB_COLORS.default) : EMOTION_ORB_COLORS.default;
+
+  // Stitch: radial-gradient(circle at 30% 30%, #a5b4fc, #818cf8)
+  // + box-shadow: inset -2px -2px 10px rgba(255,255,255,0.4), 0 4px 12px rgba(129,140,248,0.3)
   return (
-    <View style={[styles.container, { width: size, height: size }]}>
-      <AnimatedSvg height={size} width={size} style={animatedStyle}>
-        <Defs>
-          <RadialGradient
-            id="grad"
-            cx="30%"
-            cy="30%"
-            r="70%"
-            fx="30%"
-            fy="30%"
-          >
-            <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.8" />
-            <Stop offset="40%" stopColor={color} stopOpacity="0.8" />
-            <Stop offset="100%" stopColor={color} stopOpacity="1" />
-          </RadialGradient>
-        </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#grad)" />
-      </AnimatedSvg>
-    </View>
+    <Animated.View
+      style={[
+        styles.container,
+        { width: size, height: size, borderRadius: size / 2 },
+        { backgroundColor: colors[1] },
+        animatedStyle,
+      ]}
+    >
+      <View
+        style={[
+          styles.innerGlow,
+          {
+            width: size * 0.6,
+            height: size * 0.6,
+            borderRadius: size * 0.3,
+            backgroundColor: colors[0],
+            top: size * 0.15,
+            left: size * 0.15,
+          },
+        ]}
+      />
+    </Animated.View>
   );
 };
 
@@ -64,10 +85,15 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: 'rgba(129, 140, 248, 0.3)',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowOpacity: 1,
+    shadowRadius: 12,
     elevation: 8,
+    overflow: 'hidden',
+  },
+  innerGlow: {
+    position: 'absolute',
+    opacity: 0.6,
   },
 });

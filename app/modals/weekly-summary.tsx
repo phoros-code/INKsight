@@ -25,7 +25,7 @@ import { JournalEntry } from '../../src/types';
 import { getEntriesByRange } from '../../src/database/journalDB';
 import { getCheckinsForRange } from '../../src/database/checkinDB';
 import { generateWeeklyPatterns } from '../../src/services/patternEngine';
-import { MoodOrb } from '../../src/components/home/MoodOrb';
+import { DonutChart } from '../../src/components/insights/DonutChart';
 
 // Custom Animated Number component
 const AnimatedNumber = ({ value }: { value: number }) => {
@@ -57,7 +57,7 @@ export default function WeeklySummaryModal() {
   // States
   const [dateRangeStr, setDateRangeStr] = useState('');
   const [stats, setStats] = useState({ totalEntries: 0, totalWords: 0, avgTime: 'N/A' });
-  const [dominantEmotion, setDominantEmotion] = useState({ name: 'Neutral', color: Colors.emotionNeutral });
+  const [dominantEmotion, setDominantEmotion] = useState<{ name: string, color: string, percent: number }>({ name: 'Neutral', color: Colors.emotionNeutral, percent: 0 });
   const [secondaryEmotions, setSecondaryEmotions] = useState<string[]>([]);
   const [topSentence, setTopSentence] = useState({ text: '', date: '' });
   const [insightMessage, setInsightMessage] = useState('');
@@ -113,7 +113,10 @@ export default function WeeklySummaryModal() {
       const sortedE = Object.entries(eCounts).sort((a, b) => b[1].count - a[1].count);
       
       if (sortedE.length > 0) {
-         setDominantEmotion({ name: sortedE[0][0], color: sortedE[0][1].color });
+         const topCount = sortedE[0][1].count;
+         const totalCount = entries.length;
+         const percent = Math.round((topCount / totalCount) * 100);
+         setDominantEmotion({ name: sortedE[0][0], color: sortedE[0][1].color, percent });
          setSecondaryEmotions(sortedE.slice(1, 4).map(e => e[0]));
       }
 
@@ -214,10 +217,10 @@ export default function WeeklySummaryModal() {
             {/* DOMINANT EMOTION CARD */}
             <View style={styles.contentCard}>
                <View style={styles.orbSide}>
-                 <MoodOrb size={52} color={dominantEmotion.color} />
+                 <DonutChart percentage={dominantEmotion.percent} color={dominantEmotion.color} size={64} strokeWidth={8} />
                </View>
                <View style={styles.emotionInfoSide}>
-                 <Text style={styles.cardHeaderSmall}>Dominant Feeling</Text>
+                 <Text style={styles.cardHeaderSmall}>DOMINANT EMOTION</Text>
                  <Text style={styles.dominantWord}>{dominantEmotion.name}</Text>
                  {secondaryEmotions.length > 0 && (
                    <View style={styles.secondaryEmotionsRow}>
@@ -245,7 +248,7 @@ export default function WeeklySummaryModal() {
             {/* TOP SENTENCE */}
             {topSentence.text ? (
               <View style={styles.contentCard}>
-                 <Text style={styles.cardHeaderSmall}>✨ Most powerful sentence</Text>
+                 <Text style={styles.cardHeaderSmall}>✨ WEEK'S BEST SENTENCE</Text>
                  <Text style={styles.sentenceText}>"{topSentence.text}"</Text>
                  <Text style={styles.sentenceDate}>{topSentence.date}</Text>
               </View>

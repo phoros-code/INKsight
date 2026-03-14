@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { PatternInsight } from '../../types';
 import { Colors } from '../../constants/colors';
 
@@ -8,76 +7,63 @@ interface PatternCardProps {
   insight: PatternInsight;
 }
 
+/**
+ * Stitch ref: insights_structured_scrapbook — AI Pattern Insight Cards
+ * Left colored border stripe (w-1.5), font-lora text body.
+ * Colors: terracotta (#E07A5F), sage (#A3B18A)
+ */
 const TYPE_COLORS: Record<string, string> = {
-  temporal: Colors.accent,      // #E8A87C
-  vocabulary: Colors.secondary,  // #7DBFA7
-  behavioral: Colors.primary,    // #5B8DB8
-  language: '#C4A4C0'            // Fear/Purple tone
-};
-
-const TYPE_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
-  temporal: 'clock',
-  vocabulary: 'book-open',
-  behavioral: 'activity',
-  language: 'message-circle'
+  temporal: '#E07A5F',      // terracotta
+  vocabulary: '#A3B18A',    // sage
+  behavioral: Colors.primary,
+  language: '#E07A5F',
 };
 
 export const PatternCard: React.FC<PatternCardProps> = ({ insight }) => {
-  const accentColor = TYPE_COLORS[insight.type || 'language'] || Colors.primary;
-  const iconName = TYPE_ICONS[insight.type || 'language'] || 'zap';
+  const accentColor = TYPE_COLORS[insight.type || 'language'] || '#E07A5F';
 
   return (
     <View style={styles.cardContainer}>
       <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Feather name={iconName} size={14} color="#A0ADB8" />
-          <Text style={styles.headerText}>INKSIGHT NOTICED</Text>
-        </View>
-        <Text style={styles.message}>{insight.message}</Text>
+        <Text style={styles.message}>"{insight.message}"</Text>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  // Stitch: bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden
   cardContainer: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
     elevation: 2,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
+  // Stitch: w-1.5
   accentBar: {
-    width: 4,
-    borderTopLeftRadius: 2,
-    borderBottomLeftRadius: 2,
+    width: 6,
   },
+  // Stitch: p-5 pl-7
   content: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 20,
+    paddingRight: 20,
+    paddingLeft: 24,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  headerText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: '#A0ADB8',
-    letterSpacing: 0.5,
-    marginLeft: 6,
-  },
+  // Stitch: font-lora text-sm leading-relaxed
   message: {
     fontFamily: 'Lora_400Regular',
     fontSize: 14,
-    color: '#5B6B78',
-    lineHeight: 22,
+    color: Colors.textPrimary,
+    lineHeight: 24,
   },
 });

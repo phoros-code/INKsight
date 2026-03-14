@@ -21,8 +21,12 @@ import {
 
 import {
   Inter_400Regular,
-  Inter_500Medium
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold
 } from '@expo-google-fonts/inter';
+
+import { seedWebDemoData } from '../src/utils/seedDemoData';
 
 // Only import native modules on native platforms
 let SQLiteProvider: any = null;
@@ -50,10 +54,19 @@ export default function RootLayout() {
     Lora_400Regular_Italic,
     Inter_400Regular,
     Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
     Nunito: Nunito_400Regular,
     Lora: Lora_400Regular,
     Inter: Inter_400Regular,
   });
+
+  // Auto-seed demo data on web first load
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      seedWebDemoData();
+    }
+  }, []);
 
   const [isReady, setIsReady] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
