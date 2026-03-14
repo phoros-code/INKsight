@@ -44,6 +44,8 @@ jobs:
         run: npx expo export -p web
         env:
           NODE_OPTIONS: --openssl-legacy-provider
+          EXPO_WEB_BUILD: "true"
+          EXPO_NO_TELEMETRY: "true"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
