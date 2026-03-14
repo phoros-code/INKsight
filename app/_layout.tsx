@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Platform } from 'react-native';
+import { View, Text, Platform, TouchableOpacity, StyleSheet as RNStyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../src/constants/colors';
@@ -7,6 +7,94 @@ import { ThemeProvider } from '../src/constants/ThemeContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+
+// ─── Web Passcode Lock ──────────────────────────────
+function WebPasscodeLock({ children }: { children: React.ReactNode }) {
+  const [locked, setLocked] = useState(false);
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    try {
+      const enabled = localStorage.getItem('inksight_passcode_enabled');
+      const passcode = localStorage.getItem('inksight_passcode');
+      if (enabled && JSON.parse(enabled) && passcode) {
+        setLocked(true);
+      }
+    } catch {}
+  }, []);
+
+  if (!locked) return <>{children}</>;
+
+  const handleDigit = (d: string) => {
+    const next = code + d;
+    setError('');
+    if (next.length === 4) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('inksight_passcode') || '""');
+        if (next === saved) {
+          setLocked(false);
+        } else {
+          setError('Incorrect passcode');
+          setCode('');
+        }
+      } catch {
+        setError('Error checking passcode');
+        setCode('');
+      }
+    } else {
+      setCode(next);
+    }
+  };
+
+  const handleDelete = () => { setCode(code.slice(0, -1)); setError(''); };
+
+  return (
+    <View style={lockStyles.container}>
+      <Text style={lockStyles.logo}>INK<Text style={lockStyles.logoGreen}>sight</Text></Text>
+      <Text style={lockStyles.subtitle}>Enter your passcode</Text>
+      <View style={lockStyles.dots}>
+        {[0, 1, 2, 3].map(i => (
+          <View key={i} style={[lockStyles.dot, code.length > i && lockStyles.dotFilled]} />
+        ))}
+      </View>
+      {error ? <Text style={lockStyles.error}>{error}</Text> : null}
+      <View style={lockStyles.numpad}>
+        {[['1','2','3'],['4','5','6'],['7','8','9'],['','0','⌫']].map((row, ri) => (
+          <View key={ri} style={lockStyles.numRow}>
+            {row.map((d, di) => (
+              <TouchableOpacity
+                key={di}
+                style={[lockStyles.numBtn, !d && { opacity: 0 }]}
+                onPress={() => d === '⌫' ? handleDelete() : d ? handleDigit(d) : null}
+                disabled={!d}
+                activeOpacity={0.6}
+              >
+                <Text style={lockStyles.numText}>{d}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const lockStyles = RNStyleSheet.create({
+  container: { flex: 1, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  logo: { fontSize: 36, fontWeight: '700', color: '#D4956A', marginBottom: 8 },
+  logoGreen: { color: '#7DBFA7' },
+  subtitle: { fontSize: 16, color: '#94A3B8', marginBottom: 32 },
+  dots: { flexDirection: 'row', gap: 20, marginBottom: 16 },
+  dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#D4956A' },
+  dotFilled: { backgroundColor: '#D4956A' },
+  error: { fontSize: 13, color: '#EF4444', marginBottom: 8 },
+  numpad: { marginTop: 24, gap: 12 },
+  numRow: { flexDirection: 'row', gap: 24, justifyContent: 'center' },
+  numBtn: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' },
+  numText: { fontSize: 24, fontWeight: '600', color: '#F8FAFC' },
+});
 
 import { 
   useFonts,
@@ -160,7 +248,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
-            {content}
+            <WebPasscodeLock>
+              {content}
+            </WebPasscodeLock>
           </SafeAreaProvider>
         </GestureHandlerRootView>
       </ThemeProvider>
