@@ -201,35 +201,247 @@ export default function InsightsScreen() {
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  // Share handler
+  // Generate PDF Report
   const handleShare = async () => {
-    const entries = getEntriesForPeriod(period);
-    const emotionSummary = topEmotions.map(e => `${e.emoji} ${e.name}: ${e.pct}%`).join('\n');
-    const shareText = `🌿 INKsight — My Emotional Patterns (${period})\n\n📊 Top Emotions:\n${emotionSummary}\n\n📝 ${entries.length} journal entries analyzed\n\n🔗 https://phoros-code.github.io/INKsight`;
-
-    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
+    if (Platform.OS !== 'web') {
+      const emotionSummary = topEmotions.map(e => `${e.emoji} ${e.name}: ${e.pct}%`).join('\n');
       try {
-        await (navigator as any).share({
-          title: `INKsight — My Patterns (${period})`,
-          text: shareText,
-        });
-      } catch (e: any) {
-        if (e.name !== 'AbortError') copyToClipboard(shareText);
-      }
-    } else if (Platform.OS === 'web') {
-      copyToClipboard(shareText);
-    } else {
-      try {
-        await Share.share({ message: shareText, title: `INKsight Patterns (${period})` });
+        await Share.share({ message: `🌿 INKsight Patterns (${period})\n${emotionSummary}`, title: 'INKsight Report' });
       } catch {}
+      return;
     }
-  };
 
-  const copyToClipboard = (text: string) => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(text).then(() => {
-        if (Platform.OS === 'web') alert('Copied to clipboard! Paste anywhere to share.');
-      });
+    const entries = getEntriesForPeriod(period);
+    const days = getPeriodDays(period);
+    const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+    // Build SVG chart for the report
+    const chartSvg = chartData.line ? `
+      <svg width="100%" height="180" viewBox="0 0 400 150" preserveAspectRatio="xMidYMid meet" style="margin: 12px 0;">
+        <defs>
+          <linearGradient id="rptFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#D4956A" stop-opacity="0.25" />
+            <stop offset="100%" stop-color="#D4956A" stop-opacity="0.02" />
+          </linearGradient>
+        </defs>
+        <line x1="20" y1="42" x2="380" y2="42" stroke="#E5E7EB" stroke-width="1" />
+        <line x1="20" y1="75" x2="380" y2="75" stroke="#E5E7EB" stroke-width="1" />
+        <line x1="20" y1="107" x2="380" y2="107" stroke="#E5E7EB" stroke-width="1" />
+        <path d="${chartData.fill}" fill="url(#rptFill)" />
+        <path d="${chartData.line}" fill="none" stroke="#D4956A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        ${chartData.labels.map((l, i) => {
+          const x = 20 + i * ((400 - 40) / (chartData.labels.length - 1));
+          return `<text x="${x}" y="148" text-anchor="middle" font-size="9" fill="#94A3B8" font-family="sans-serif">${l}</text>`;
+        }).join('')}
+      </svg>
+    ` : '<p style="color:#94A3B8;text-align:center;">No chart data available for this period.</p>';
+
+    // Build radar SVG
+    const rCx = 130, rCy = 120, rR = 80;
+    const radarAxes = ['joy', 'calm', 'gratitude', 'energy', 'anxiety', 'sadness'];
+    const radarLabelsArr = ['JOY', 'CALM', 'GRATITUDE', 'ENERGY', 'ANXIETY', 'SADNESS'];
+    const radarPts = radarPolygon(radarData, rCx, rCy, rR);
+    const gridOuter = radarGridPolygon(rCx, rCy, rR);
+    const gridMid = radarGridPolygon(rCx, rCy, rR * 0.66);
+    const gridInner = radarGridPolygon(rCx, rCy, rR * 0.33);
+    const axisLines = radarAxes.map((_, i) => {
+      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+      return `<line x1="${rCx}" y1="${rCy}" x2="${rCx + Math.cos(angle) * rR}" y2="${rCy + Math.sin(angle) * rR}" stroke="#E5E7EB" stroke-width="1" />`;
+    }).join('');
+    const labelSvgs = radarLabelsArr.map((label, i) => {
+      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+      const lx = rCx + Math.cos(angle) * (rR + 22);
+      const ly = rCy + Math.sin(angle) * (rR + 22);
+      const anchor = i === 0 || i === 3 ? 'middle' : i < 3 ? 'start' : 'end';
+      return `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" font-size="10" font-weight="600" fill="#64748B" font-family="sans-serif">${label}</text>`;
+    }).join('');
+    const dataDots = radarAxes.map((a, i) => {
+      const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+      const val = radarData[a] || 0.15;
+      const x = rCx + Math.cos(angle) * rR * val;
+      const y = rCy + Math.sin(angle) * rR * val;
+      return `<circle cx="${x}" cy="${y}" r="4" fill="#D4956A" stroke="#FFF" stroke-width="2" />`;
+    }).join('');
+
+    const radarSvg = `
+      <svg width="280" height="260" viewBox="0 0 260 240" style="display:block;margin:0 auto;">
+        <polygon points="${gridOuter}" fill="none" stroke="#E5E7EB" stroke-width="1" />
+        <polygon points="${gridMid}" fill="none" stroke="#F3F4F6" stroke-width="1" />
+        <polygon points="${gridInner}" fill="none" stroke="#F9FAFB" stroke-width="1" />
+        ${axisLines}
+        <polygon points="${radarPts}" fill="rgba(212,149,106,0.2)" stroke="#D4956A" stroke-width="2" />
+        ${dataDots}
+        ${labelSvgs}
+      </svg>
+    `;
+
+    // Emotion rows HTML
+    const emotionRowsHtml = topEmotions.map(em => `
+      <div style="display:flex;align-items:center;gap:16px;padding:14px 20px;background:#F8FAFC;border-radius:12px;margin-bottom:10px;">
+        <span style="font-size:28px;">${em.emoji}</span>
+        <div style="flex:1;">
+          <div style="font-size:12px;color:#64748B;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">${em.name}</div>
+          <div style="font-size:22px;font-weight:700;color:#1E293B;">${em.pct}%</div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:${em.trend >= 0 ? '#22C55E' : '#EF4444'};">
+          ${em.trend >= 0 ? '▲' : '▼'} ${Math.abs(em.trend)}%
+        </div>
+      </div>
+    `).join('');
+
+    // Pattern insights HTML
+    const patternsHtml = patterns.map(p => `
+      <div style="display:flex;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB;margin-bottom:12px;">
+        <div style="width:5px;background:${p.color};flex-shrink:0;"></div>
+        <div style="padding:16px 20px;">
+          <p style="margin:0;font-size:13px;line-height:1.7;color:#334155;font-family:Georgia,serif;">${p.text}</p>
+        </div>
+      </div>
+    `).join('');
+
+    // Radar scores table
+    const radarTableRows = radarAxes.map((a, i) => {
+      const val = radarData[a] || 0;
+      const pct = Math.round(val * 100);
+      const barColor = a === 'anxiety' || a === 'sadness' ? '#94A3B8' : '#D4956A';
+      return `
+        <tr>
+          <td style="padding:6px 12px;font-size:12px;font-weight:600;color:#475569;text-transform:capitalize;">${radarLabelsArr[i]}</td>
+          <td style="padding:6px 12px;width:60%;"><div style="background:#F1F5F9;border-radius:4px;height:12px;overflow:hidden;"><div style="background:${barColor};height:100%;width:${pct}%;border-radius:4px;"></div></div></td>
+          <td style="padding:6px 12px;font-size:12px;font-weight:700;color:#1E293B;text-align:right;">${pct}%</td>
+        </tr>
+      `;
+    }).join('');
+
+    const reportHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>INKsight — Emotional Patterns Report</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;1,400&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #FFF; color: #1E293B; padding: 40px; max-width: 800px; margin: 0 auto; }
+        @media print {
+          body { padding: 20px; }
+          .no-print { display: none !important; }
+          @page { margin: 15mm; size: A4; }
+        }
+        .header { text-align: center; padding-bottom: 32px; border-bottom: 2px solid #F1F5F9; margin-bottom: 32px; }
+        .logo { font-size: 32px; font-weight: 700; color: #D4956A; letter-spacing: -0.5px; }
+        .logo span { color: #7DBFA7; }
+        .motto { font-family: 'Lora', Georgia, serif; font-style: italic; color: #94A3B8; font-size: 14px; margin-top: 8px; }
+        .meta { display: flex; justify-content: space-between; margin-top: 16px; font-size: 12px; color: #64748B; }
+        .section { margin-bottom: 36px; }
+        .section-title { font-size: 18px; font-weight: 700; color: #1E293B; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .section-title::before { content: ''; display: inline-block; width: 4px; height: 20px; background: #D4956A; border-radius: 2px; }
+        .chart-card { background: #FAFBFC; border: 1px solid #F1F5F9; border-radius: 16px; padding: 24px; }
+        .range-info { text-align: right; font-size: 10px; color: #94A3B8; margin-bottom: 8px; }
+        .range-value { font-weight: 700; color: #D4956A; letter-spacing: 1px; }
+        .footer { text-align: center; padding-top: 32px; border-top: 2px solid #F1F5F9; margin-top: 40px; }
+        .footer-link { color: #D4956A; text-decoration: none; font-weight: 600; font-size: 14px; }
+        .footer-text { font-size: 11px; color: #94A3B8; margin-top: 8px; }
+        .btn-bar { display: flex; gap: 12px; justify-content: center; margin: 24px 0; }
+        .btn { padding: 12px 28px; border-radius: 12px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; }
+        .btn-primary { background: #D4956A; color: #FFF; }
+        .btn-secondary { background: #F1F5F9; color: #475569; }
+        .btn:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; }
+      </style>
+    </head>
+    <body>
+      <!-- Action Buttons -->
+      <div class="btn-bar no-print">
+        <button class="btn btn-primary" onclick="window.print()">📄 Save as PDF / Print</button>
+        <button class="btn btn-secondary" onclick="copyReport()">📋 Copy to Clipboard</button>
+        <button class="btn btn-secondary" onclick="shareReport()">📤 Share</button>
+      </div>
+
+      <!-- Header -->
+      <div class="header">
+        <div class="logo">INK<span>sight</span></div>
+        <div class="motto">"Your words hold the map to your inner world."</div>
+        <div class="meta">
+          <span>📅 Report Date: ${dateStr}</span>
+          <span>📊 Period: ${period} (${entries.length} entries)</span>
+        </div>
+      </div>
+
+      <!-- Emotional Journey -->
+      <div class="section">
+        <div class="section-title">Emotional Journey</div>
+        <div class="chart-card">
+          <div class="range-info">Mood Range: <span class="range-value">LOW — HIGH</span></div>
+          ${chartSvg}
+        </div>
+      </div>
+
+      <!-- Emotion Mix -->
+      <div class="section">
+        <div class="section-title">Emotion Mix</div>
+        <div class="chart-card" style="display:flex;gap:32px;align-items:center;flex-wrap:wrap;justify-content:center;">
+          <div>${radarSvg}</div>
+          <div style="flex:1;min-width:200px;">
+            <table>${radarTableRows}</table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Emotions -->
+      <div class="section">
+        <div class="section-title">Top Emotions</div>
+        ${emotionRowsHtml || '<p style="color:#94A3B8;">No emotion data available.</p>'}
+      </div>
+
+      <!-- AI Pattern Insights -->
+      ${patterns.length > 0 ? `
+      <div class="section">
+        <div class="section-title">AI Pattern Insights</div>
+        ${patternsHtml}
+      </div>
+      ` : ''}
+
+      <!-- Footer -->
+      <div class="footer">
+        <div class="logo" style="font-size:20px;">INK<span>sight</span></div>
+        <div class="motto">"Your words hold the map to your inner world."</div>
+        <div style="margin-top:12px;">
+          <a class="footer-link" href="https://phoros-code.github.io/INKsight">🔗 phoros-code.github.io/INKsight</a>
+        </div>
+        <div class="footer-text">Generated by INKsight • AI-Powered Journaling & Emotional Wellness</div>
+      </div>
+
+      <script>
+        function copyReport() {
+          const text = document.body.innerText;
+          navigator.clipboard.writeText(text).then(() => alert('Report copied to clipboard!'));
+        }
+        async function shareReport() {
+          if (navigator.share) {
+            try {
+              await navigator.share({
+                title: 'INKsight — My Emotional Patterns Report',
+                text: 'Check out my emotional patterns report from INKsight!',
+                url: 'https://phoros-code.github.io/INKsight',
+              });
+            } catch(e) { if (e.name !== 'AbortError') copyReport(); }
+          } else {
+            copyReport();
+          }
+        }
+      </script>
+    </body>
+    </html>
+    `;
+
+    // Open in new window
+    const reportWindow = window.open('', '_blank', 'width=850,height=1100');
+    if (reportWindow) {
+      reportWindow.document.write(reportHtml);
+      reportWindow.document.close();
+    } else {
+      alert('Please allow pop-ups to generate the PDF report.');
     }
   };
 
