@@ -42,6 +42,8 @@ jobs:
 
       - name: Build Web App
         run: npx expo export -p web
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
