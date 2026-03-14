@@ -26,13 +26,42 @@ export default function DailyCheckinModal() {
 
   const handleSave = () => {
     if (Platform.OS === 'web') {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const energyLabel = ENERGY_LEVELS[energy].label;
+      
+      // Save check-in
       webStore.insertCheckIn({
-        date: new Date().toISOString().split('T')[0],
+        date: dateStr,
         sleep_quality: energy + 1,
         energy_level: energy + 1,
         focus,
         quick_note: note,
         created_at: new Date().toISOString(),
+      });
+
+      // Also create a journal entry so it appears in the journal
+      const content = note.trim()
+        ? `Daily Check-In: Feeling ${energyLabel}. Focus: ${focus}. ${note}`
+        : `Daily Check-In: Feeling ${energyLabel}. Today's focus: ${focus}.`;
+      
+      const emotionMap: Record<string, string> = {
+        'Drained': 'tired', 'Low': 'anxious', 'Steady': 'content',
+        'Brisk': 'hopeful', 'Radiant': 'joyful',
+      };
+      const emotionName = emotionMap[energyLabel] || 'content';
+      const emotions = [{ emotion: emotionName, score: (energy + 1) / 5, color: ENERGY_LEVELS[energy].color }];
+      
+      webStore.insertEntry({
+        date: dateStr,
+        created_at: new Date().toISOString(),
+        content,
+        word_count: content.split(/\s+/).length,
+        detected_emotions: JSON.stringify(emotions),
+        dominant_emotion: JSON.stringify(emotions[0]),
+        tags: JSON.stringify([focus]),
+        mood_score: (energy + 1) * 2,
+        prompt_used: 'Daily Check-In',
+        linguistic_score: null,
       });
     }
     setSaved(true);

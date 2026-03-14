@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { useRouter }
+from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Path } from 'react-native-svg';
+import { webStore } from '../../src/database/webDataStore';
 
 const EMOTIONS = [
   { name: 'Joy', color: Colors.emotionJoy, subs: ['ecstatic', 'cheerful', 'serene', 'optimistic'] },
@@ -24,6 +26,30 @@ export default function EmotionWheelModal() {
   const [selectedSub, setSelectedSub] = useState('melancholic');
 
   const currentEmotion = EMOTIONS[selected];
+
+  const handleAddToJournal = () => {
+    if (Platform.OS === 'web') {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const emotions = [
+        { emotion: selectedSub, score: 0.9, color: currentEmotion.color },
+        { emotion: currentEmotion.name.toLowerCase(), score: 0.8, color: currentEmotion.color },
+      ];
+      const content = `Feeling ${selectedSub} — a shade of ${currentEmotion.name.toLowerCase()}.`;
+      webStore.insertEntry({
+        date: dateStr,
+        created_at: new Date().toISOString(),
+        content,
+        word_count: content.split(/\s+/).length,
+        detected_emotions: JSON.stringify(emotions),
+        dominant_emotion: JSON.stringify(emotions[0]),
+        tags: JSON.stringify(['Emotion Wheel']),
+        mood_score: selected <= 1 || selected === 7 ? 7 : selected >= 4 && selected <= 6 ? 3 : 5,
+        prompt_used: 'Emotion Wheel',
+        linguistic_score: null,
+      });
+    }
+    router.back();
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.isDark ? theme.background : Colors.darkBg }]}>
@@ -107,7 +133,7 @@ export default function EmotionWheelModal() {
         </View>
 
         {/* Actions */}
-        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.primary, shadowColor: theme.primary }]} onPress={() => router.back()} activeOpacity={0.9}>
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.primary, shadowColor: theme.primary }]} onPress={handleAddToJournal} activeOpacity={0.9}>
           <Text style={[styles.primaryBtnText, { color: theme.primaryButtonText }]}>Add to Journal</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()}>

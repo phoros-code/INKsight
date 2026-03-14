@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ export default function HomeScreen() {
   const [latestEntry, setLatestEntry] = useState<any>(null);
   const [todayMood, setTodayMood] = useState<string>('Thoughtful · Reflective');
   const [emotions, setEmotions] = useState<any[]>([]);
+  const [energyLabel, setEnergyLabel] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -37,12 +39,26 @@ export default function HomeScreen() {
           setTodayMood(`${dominant.charAt(0).toUpperCase() + dominant.slice(1)} · Reflective`);
         }
       }
+      // Read today's check-in energy
+      if (Platform.OS === 'web') {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const checkin = webStore.getCheckInByDate(todayStr);
+        if (checkin) {
+          const labels = ['', 'Drained', 'Low', 'Steady', 'Brisk', 'Radiant'];
+          setEnergyLabel(labels[checkin.energy_level] || null);
+        }
+      }
     } catch (e) {
       console.warn('HomeScreen loadData error:', e);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Reload data when screen comes into focus (e.g., returning from check-in or emotion wheel)
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -101,6 +117,11 @@ export default function HomeScreen() {
             <View style={styles.moodInfo}>
               <Text style={[styles.moodLabel, { color: textMuted }]}>TODAY'S ENERGY</Text>
               <Text style={[styles.moodTitle, { color: textMain }]}>{todayMood}</Text>
+              {energyLabel && (
+                <View style={[styles.emotionTag, { backgroundColor: primary + '15', marginTop: 4 }]}>
+                  <Text style={[styles.emotionTagText, { color: primary }]}>⚡ {energyLabel}</Text>
+                </View>
+              )}
               <View style={styles.emotionTags}>
                 {emotions.slice(0, 2).map((em: any, i: number) => (
                   <View key={i} style={[styles.emotionTag, { backgroundColor: (em.color || primary) + '15' }]}>

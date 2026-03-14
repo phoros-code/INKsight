@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/constants/ThemeContext';
@@ -7,11 +7,19 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { webStore } from '../../src/database/webDataStore';
 import * as journalDB from '../../src/database/journalDB';
 
-const WORD_SUGGESTIONS = ['melancholic', 'at peace', 'restless'];
-const CONTEXT_TAGS = [
-  { icon: 'wb-sunny' as const, label: 'Morning' },
-  { icon: 'work-outline' as const, label: 'Work' },
-  { icon: 'home' as const, label: 'Home' },
+const WORD_SUGGESTIONS = [
+  'melancholic', 'at peace', 'restless', 'grateful', 'curious',
+  'hopeful', 'overwhelmed', 'serene', 'anxious', 'joyful',
+  'reflective', 'content', 'uncertain', 'inspired', 'nostalgic',
+];
+
+const CONTEXT_TAGS: { icon: string; label: string }[] = [
+  { icon: 'wb-sunny', label: 'Morning' },
+  { icon: 'work-outline', label: 'Work' },
+  { icon: 'home', label: 'Home' },
+  { icon: 'nightlight-round', label: 'Evening' },
+  { icon: 'directions-walk', label: 'Walk' },
+  { icon: 'restaurant', label: 'Meal' },
 ];
 
 const PROMPTS = [
@@ -22,25 +30,78 @@ const PROMPTS = [
   "What small thing brought you comfort today?",
 ];
 
+// Generate date range for calendar strip
+function generateDateRange(days: number): { date: Date; dateStr: string }[] {
+  const result: { date: Date; dateStr: string }[] = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    result.push({ date: d, dateStr: d.toISOString().split('T')[0] });
+  }
+  return result;
+}
+
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
 export default function JournalScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const [content, setContent] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null); // single-select
   const [detectedEmotions, setDetectedEmotions] = useState([
     { emotion: 'calm', color: Colors.sage },
     { emotion: 'pensive', color: '#89ABD4' },
   ]);
   const [prompt, setPrompt] = useState('');
   const [saved, setSaved] = useState(false);
+  const [customTag, setCustomTag] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [allTags, setAllTags] = useState(CONTEXT_TAGS);
+
+  // Calendar mode
+  const [calendarDates] = useState(() => generateDateRange(90));
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [isViewingPast, setIsViewingPast] = useState(false);
+  const [viewedEntry, setViewedEntry] = useState<any>(null);
+  const [entryDates, setEntryDates] = useState<Set<string>>(new Set());
+
+  // Load entry dates for calendar dots
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const all = webStore.getAllEntries();
+      setEntryDates(new Set(all.map(e => e.date)));
+    }
+  }, [saved]);
 
   useEffect(() => {
     setPrompt(PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
   }, []);
 
-  // Simple emotion detection based on keywords
+  // When a date is selected, load the entry for that date
   useEffect(() => {
-    if (!content) return;
+    if (selectedDate === todayStr) {
+      setIsViewingPast(false);
+      setViewedEntry(null);
+      return;
+    }
+    if (Platform.OS === 'web') {
+      const entry = webStore.getEntryByDate(selectedDate);
+      if (entry) {
+        setIsViewingPast(true);
+        setViewedEntry(entry);
+      } else {
+        setIsViewingPast(true);
+        setViewedEntry(null);
+      }
+    }
+  }, [selectedDate]);
+
+  // Emotion detection
+  useEffect(() => {
+    if (!content || isViewingPast) return;
     const lower = content.toLowerCase();
     const found: { emotion: string; color: string }[] = [];
     if (lower.includes('peace') || lower.includes('calm') || lower.includes('quiet')) found.push({ emotion: 'calm', color: Colors.sage });
@@ -50,13 +111,7 @@ export default function JournalScreen() {
     if (lower.includes('hope') || lower.includes('better') || lower.includes('looking forward')) found.push({ emotion: 'hopeful', color: '#90C49A' });
     if (lower.includes('think') || lower.includes('wonder') || lower.includes('reflect')) found.push({ emotion: 'pensive', color: '#89ABD4' });
     if (found.length > 0) setDetectedEmotions(found.slice(0, 3));
-  }, [content]);
-
-  const toggleTag = (label: string) => {
-    setSelectedTags(prev =>
-      prev.includes(label) ? prev.filter(t => t !== label) : [...prev, label]
-    );
-  };
+  }, [content, isViewingPast]);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -68,18 +123,41 @@ export default function JournalScreen() {
         wordCount: content.trim().split(/\s+/).length,
         detectedEmotions: emotions,
         dominantEmotion: emotions[0] || null,
-        tags: selectedTags,
+        tags: selectedTag ? [selectedTag] : [],
         moodScore: 6,
         promptUsed: prompt,
       };
       await journalDB.insertEntry(null, entry);
       setSaved(true);
+      setContent('');
       setTimeout(() => setSaved(false), 2000);
     } catch (e) { console.warn('Save error:', e); }
   };
 
+  const handleAddCustomTag = () => {
+    if (customTag.trim()) {
+      const newTag = { icon: 'label' as const, label: customTag.trim() };
+      setAllTags(prev => [...prev, newTag]);
+      setSelectedTag(customTag.trim());
+      setCustomTag('');
+      setShowCustomInput(false);
+    }
+  };
+
   const today = new Date();
-  const dateLabel = `${['January','February','March','April','May','June','July','August','September','October','November','December'][today.getMonth()]} ${today.getDate()}`;
+  const dateLabel = `${MONTHS_SHORT[today.getMonth()]} ${today.getDate()}`;
+
+  // Parse viewed entry emotions
+  const viewedEmotions = viewedEntry ? (() => {
+    try {
+      return typeof viewedEntry.detected_emotions === 'string'
+        ? JSON.parse(viewedEntry.detected_emotions)
+        : viewedEntry.detected_emotions || [];
+    } catch { return []; }
+  })() : [];
+
+  const viewedMoodScore = viewedEntry?.mood_score || 0;
+  const moodEmoji = viewedMoodScore >= 8 ? '😊' : viewedMoodScore >= 6 ? '🙂' : viewedMoodScore >= 4 ? '😐' : '😔';
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -89,141 +167,327 @@ export default function JournalScreen() {
           <MaterialIcons name="close" size={20} color={theme.textMuted} />
           <Text style={[styles.closeBtnText, { color: theme.textMuted }]}>Close</Text>
         </TouchableOpacity>
-        <Text style={[styles.dateTitle, { color: theme.textMain }]}>{dateLabel}</Text>
-        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSave}>
-          <Text style={[styles.saveBtnText, { color: theme.primaryButtonText }]}>{saved ? '✓ Saved' : 'Save'}</Text>
-        </TouchableOpacity>
+        <Text style={[styles.dateTitle, { color: theme.textMain }]}>
+          {isViewingPast ? selectedDate : dateLabel}
+        </Text>
+        {!isViewingPast ? (
+          <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSave}>
+            <Text style={[styles.saveBtnText, { color: theme.primaryButtonText }]}>{saved ? '✓ Saved' : 'Save'}</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 60 }} />
+        )}
       </View>
 
-      <ScrollView style={styles.mainScroll} contentContainerStyle={styles.mainContent} showsVerticalScrollIndicator={false}>
-        {/* Prompt Card */}
-        <View style={[styles.promptCard, { backgroundColor: theme.isDark ? theme.card : Colors.accentBlue, borderColor: theme.primary + '15' }]}>
-          <View style={styles.promptHeader}>
-            <MaterialIcons name="auto-awesome" size={20} color={theme.primary} />
-            <Text style={[styles.promptLabel, { color: theme.primary }]}>DAILY SPARK</Text>
-          </View>
-          <Text style={[styles.promptText, { color: theme.textMain }]}>{prompt}</Text>
-        </View>
-
-        {/* Writing Area */}
-        <View style={[styles.writingCard, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF15' : '#E5E7EB' }]}>
-          <TextInput
-            style={[styles.textarea, { color: theme.textMain }]}
-            placeholder="Begin writing freely..."
-            placeholderTextColor={theme.textMuted + '80'}
-            multiline
-            value={content}
-            onChangeText={setContent}
-            textAlignVertical="top"
-          />
-          {/* Word Mirror Strip */}
-          <View style={styles.wordMirrorStrip}>
-            <View style={styles.wordMirrorLabel}>
-              <MaterialIcons name="auto-fix-high" size={14} color={Colors.primary} />
-              <Text style={styles.wordMirrorLabelText}>WORD SUGGESTIONS</Text>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestionsScroll}>
-              {WORD_SUGGESTIONS.map((w, i) => (
-                <TouchableOpacity key={i} style={styles.suggestionChip} onPress={() => setContent(prev => prev + ' ' + w)}>
-                  <Text style={styles.suggestionText}>{w}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+      {/* Calendar Date Strip */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.calendarStrip}
+        style={styles.calendarContainer}
+      >
+        {calendarDates.map(({ date, dateStr }) => {
+          const isToday = dateStr === todayStr;
+          const isSelected = dateStr === selectedDate;
+          const hasEntry = entryDates.has(dateStr);
+          return (
             <TouchableOpacity
-              style={styles.wordMirrorBtn}
-              onPress={() => router.push('/modals/word-mirror' as any)}
-              activeOpacity={0.8}
+              key={dateStr}
+              style={[
+                styles.calendarDay,
+                { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF0D' : '#0000000A' },
+                isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
+              ]}
+              onPress={() => setSelectedDate(dateStr)}
+              activeOpacity={0.7}
             >
-              <MaterialIcons name="psychology" size={16} color={theme.primary} />
-              <Text style={[styles.wordMirrorBtnText, { color: theme.primary }]}>Word Mirror</Text>
+              <Text style={[
+                styles.calendarDayName,
+                { color: theme.textMuted },
+                isSelected && { color: theme.primaryButtonText },
+              ]}>
+                {DAYS_SHORT[date.getDay()]}
+              </Text>
+              <Text style={[
+                styles.calendarDayNum,
+                { color: theme.textMain },
+                isSelected && { color: theme.primaryButtonText },
+              ]}>
+                {date.getDate()}
+              </Text>
+              {hasEntry && !isSelected && (
+                <View style={[styles.calendarDot, { backgroundColor: theme.primary }]} />
+              )}
+              {isToday && !isSelected && (
+                <View style={[styles.calendarDot, { backgroundColor: '#F59E0B' }]} />
+              )}
             </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Context Tags */}
-        <View style={styles.tagsSection}>
-          <Text style={styles.tagsLabel}>ADD CONTEXT:</Text>
-          <View style={styles.tagsRow}>
-            {CONTEXT_TAGS.map((t, i) => (
-              <TouchableOpacity
-                key={i}
-                style={[styles.contextTag, selectedTags.includes(t.label) && styles.contextTagActive]}
-                onPress={() => toggleTag(t.label)}
-              >
-                <MaterialIcons name={t.icon} size={16} color={selectedTags.includes(t.label) ? Colors.primary : Colors.textMuted} />
-                <Text style={[styles.contextTagText, selectedTags.includes(t.label) && { color: Colors.primary }]}>{t.label}</Text>
-              </TouchableOpacity>
-            ))}
-            <View style={styles.addTagBtn}>
-              <MaterialIcons name="add" size={18} color={Colors.textMuted + '80'} />
-            </View>
-          </View>
-        </View>
+          );
+        })}
       </ScrollView>
 
-      {/* Bottom Emotion Detection Bar */}
-      <TouchableOpacity
-        style={styles.emotionBar}
-        onPress={() => router.push('/modals/emotion-wheel' as any)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.emotionBarLeft}>
-          <Text style={styles.sensingLabel}>SENSING:</Text>
-          <View style={styles.sensedEmotions}>
-            {detectedEmotions.slice(0, 2).map((em, i) => (
-              <View key={i} style={[styles.sensedPill, { backgroundColor: em.color + '20' }]}>
-                <View style={[styles.sensedDot, { backgroundColor: em.color }]} />
-                <Text style={[styles.sensedText, { color: em.color }]}>{em.emotion}</Text>
+      {isViewingPast ? (
+        /* Past Entry View */
+        <ScrollView style={styles.mainScroll} contentContainerStyle={[styles.mainContent, { paddingBottom: 140 }]} showsVerticalScrollIndicator={false}>
+          {viewedEntry ? (
+            <>
+              {/* Mood Badge */}
+              <View style={[styles.moodBadge, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF10' : '#0000000A' }]}>
+                <Text style={styles.moodEmoji}>{moodEmoji}</Text>
+                <View>
+                  <Text style={[styles.moodLabel, { color: theme.textMuted }]}>MOOD SCORE</Text>
+                  <Text style={[styles.moodValue, { color: theme.textMain }]}>{viewedMoodScore}/10</Text>
+                </View>
+                <View style={styles.moodEmotions}>
+                  {viewedEmotions.slice(0, 3).map((em: any, i: number) => (
+                    <View key={i} style={[styles.moodPill, { backgroundColor: (em.color || theme.primary) + '20' }]}>
+                      <Text style={[styles.moodPillText, { color: em.color || theme.primary }]}>{em.emotion}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            ))}
+
+              {/* Entry Content */}
+              <View style={[styles.pastEntryCard, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF15' : '#E5E7EB' }]}>
+                <Text style={[styles.pastEntryTime, { color: theme.textMuted }]}>
+                  {new Date(viewedEntry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                <Text style={[styles.pastEntryText, { color: theme.textMain }]}>
+                  {viewedEntry.content}
+                </Text>
+                {viewedEntry.tags && (
+                  <View style={styles.pastEntryTags}>
+                    {(typeof viewedEntry.tags === 'string' ? JSON.parse(viewedEntry.tags) : viewedEntry.tags).map((t: string, i: number) => (
+                      <View key={i} style={[styles.pastTag, { backgroundColor: theme.primary + '15' }]}>
+                        <Text style={[styles.pastTagText, { color: theme.primary }]}>{t}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Back to today */}
+              <TouchableOpacity
+                style={[styles.backToTodayBtn, { backgroundColor: theme.primary }]}
+                onPress={() => setSelectedDate(todayStr)}
+              >
+                <MaterialIcons name="edit" size={18} color={theme.primaryButtonText} />
+                <Text style={[styles.backToTodayText, { color: theme.primaryButtonText }]}>Write Today's Entry</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.emptyPast}>
+              <Text style={{ fontSize: 48 }}>📝</Text>
+              <Text style={[styles.emptyPastTitle, { color: theme.textMain }]}>No entry for this day</Text>
+              <Text style={[styles.emptyPastSub, { color: theme.textMuted }]}>You didn't journal on this date.</Text>
+              <TouchableOpacity
+                style={[styles.backToTodayBtn, { backgroundColor: theme.primary }]}
+                onPress={() => setSelectedDate(todayStr)}
+              >
+                <Text style={[styles.backToTodayText, { color: theme.primaryButtonText }]}>Write Today's Entry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      ) : (
+        /* Today: Writing Mode */
+        <ScrollView style={styles.mainScroll} contentContainerStyle={[styles.mainContent, { paddingBottom: 140 }]} showsVerticalScrollIndicator={false}>
+          {/* Prompt Card */}
+          <View style={[styles.promptCard, { backgroundColor: theme.isDark ? theme.card : Colors.accentBlue, borderColor: theme.primary + '15' }]}>
+            <View style={styles.promptHeader}>
+              <MaterialIcons name="auto-awesome" size={20} color={theme.primary} />
+              <Text style={[styles.promptLabel, { color: theme.primary }]}>DAILY SPARK</Text>
+            </View>
+            <Text style={[styles.promptText, { color: theme.textMain }]}>{prompt}</Text>
           </View>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: theme.primary }}>Explore</Text>
-          <MaterialIcons name="chevron-right" size={18} color={theme.primary} />
-        </View>
-      </TouchableOpacity>
+
+          {/* Writing Area */}
+          <View style={[styles.writingCard, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF15' : '#E5E7EB' }]}>
+            <TextInput
+              style={[styles.textarea, { color: theme.textMain }]}
+              placeholder="Begin writing freely..."
+              placeholderTextColor={theme.textMuted + '80'}
+              multiline
+              value={content}
+              onChangeText={setContent}
+              textAlignVertical="top"
+            />
+            {/* Word Mirror Strip */}
+            <View style={styles.wordMirrorStrip}>
+              <View style={styles.wordMirrorLabel}>
+                <MaterialIcons name="auto-fix-high" size={14} color={theme.primary} />
+                <Text style={[styles.wordMirrorLabelText, { color: theme.primary }]}>WORD SUGGESTIONS</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestionsScroll}>
+                {WORD_SUGGESTIONS.map((w, i) => (
+                  <TouchableOpacity key={i} style={[styles.suggestionChip, { backgroundColor: theme.background, borderColor: theme.isDark ? '#FFFFFF15' : '#E5E7EB' }]} onPress={() => setContent(prev => prev + ' ' + w)}>
+                    <Text style={[styles.suggestionText, { color: theme.textMuted }]}>{w}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity
+                style={[styles.wordMirrorBtn, { backgroundColor: theme.primary + '10', borderColor: theme.primary + '30' }]}
+                onPress={() => router.push('/modals/word-mirror' as any)}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="psychology" size={16} color={theme.primary} />
+                <Text style={[styles.wordMirrorBtnText, { color: theme.primary }]}>Word Mirror</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Context Tags — Single Select */}
+          <View style={styles.tagsSection}>
+            <Text style={[styles.tagsLabel, { color: theme.textMuted }]}>ADD CONTEXT:</Text>
+            <View style={styles.tagsRow}>
+              {allTags.map((t, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[
+                    styles.contextTag,
+                    { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF15' : '#E5E7EB' },
+                    selectedTag === t.label && { borderColor: theme.primary + '40', backgroundColor: theme.primary + '08' },
+                  ]}
+                  onPress={() => setSelectedTag(selectedTag === t.label ? null : t.label)}
+                >
+                  <MaterialIcons name={t.icon as any} size={16} color={selectedTag === t.label ? theme.primary : theme.textMuted} />
+                  <Text style={[styles.contextTagText, { color: theme.textMuted }, selectedTag === t.label && { color: theme.primary }]}>{t.label}</Text>
+                </TouchableOpacity>
+              ))}
+              {showCustomInput ? (
+                <View style={[styles.customTagInput, { borderColor: theme.primary }]}>
+                  <TextInput
+                    style={[styles.customTagField, { color: theme.textMain }]}
+                    placeholder="Tag name..."
+                    placeholderTextColor={theme.textMuted + '80'}
+                    value={customTag}
+                    onChangeText={setCustomTag}
+                    onSubmitEditing={handleAddCustomTag}
+                    autoFocus
+                  />
+                  <TouchableOpacity onPress={handleAddCustomTag}>
+                    <MaterialIcons name="check" size={18} color={theme.primary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={[styles.addTagBtn, { borderColor: theme.textMuted + '40' }]} onPress={() => setShowCustomInput(true)}>
+                  <MaterialIcons name="add" size={18} color={theme.textMuted + '80'} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Bottom Emotion Detection Bar — only in write mode */}
+      {!isViewingPast && (
+        <TouchableOpacity
+          style={[styles.emotionBar, { backgroundColor: theme.card, borderTopColor: theme.isDark ? '#FFFFFF10' : '#E5E7EB' }]}
+          onPress={() => router.push('/modals/emotion-wheel' as any)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.emotionBarLeft}>
+            <Text style={[styles.sensingLabel, { color: theme.textMuted }]}>SENSING:</Text>
+            <View style={styles.sensedEmotions}>
+              {detectedEmotions.slice(0, 2).map((em, i) => (
+                <View key={i} style={[styles.sensedPill, { backgroundColor: em.color + '20' }]}>
+                  <View style={[styles.sensedDot, { backgroundColor: em.color }]} />
+                  <Text style={[styles.sensedText, { color: em.color }]}>{em.emotion}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: theme.primary }}>Explore</Text>
+            <MaterialIcons name="chevron-right" size={18} color={theme.primary} />
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1 },
   topNav: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 24, paddingVertical: 16,
-    backgroundColor: Colors.background + 'CC',
     ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } as any : {}),
   },
   closeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  closeBtnText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textMuted },
-  dateTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, color: Colors.textDark, fontWeight: '600' },
+  closeBtnText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  dateTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, fontWeight: '600' },
   saveBtn: {
-    backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 6,
+    paddingHorizontal: 24, paddingVertical: 6,
     borderRadius: 20,
   },
-  saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#FFF', fontWeight: '600' },
+  saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, fontWeight: '600' },
+
+  // Calendar Strip
+  calendarContainer: { maxHeight: 80, flexGrow: 0 },
+  calendarStrip: { paddingHorizontal: 16, gap: 8, paddingBottom: 8 },
+  calendarDay: {
+    width: 52, height: 66, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center', gap: 2,
+    borderWidth: 1,
+  },
+  calendarDayName: { fontFamily: 'Inter_400Regular', fontSize: 10 },
+  calendarDayNum: { fontFamily: 'Inter_700Bold', fontSize: 18, fontWeight: '700' },
+  calendarDot: { width: 5, height: 5, borderRadius: 3 },
 
   mainScroll: { flex: 1 },
-  mainContent: { paddingHorizontal: 16, gap: 16, paddingBottom: 100 },
+  mainContent: { paddingHorizontal: 16, gap: 16 },
 
+  // Past entry view
+  moodBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    padding: 16, borderRadius: 16, borderWidth: 1,
+  },
+  moodEmoji: { fontSize: 36 },
+  moodLabel: { fontFamily: 'Inter_400Regular', fontSize: 10, textTransform: 'uppercase' as any, letterSpacing: 1 },
+  moodValue: { fontFamily: 'Inter_700Bold', fontSize: 20, fontWeight: '700' },
+  moodEmotions: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
+  moodPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  moodPillText: { fontFamily: 'Inter_500Medium', fontSize: 11, fontWeight: '500' },
+
+  pastEntryCard: {
+    borderRadius: 16, padding: 24, borderWidth: 1, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,
+  },
+  pastEntryTime: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  pastEntryText: { fontFamily: 'Lora_400Regular', fontSize: 16, lineHeight: 28 },
+  pastEntryTags: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  pastTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  pastTagText: { fontFamily: 'Inter_500Medium', fontSize: 11, fontWeight: '500' },
+
+  emptyPast: { alignItems: 'center', marginTop: 48, gap: 12 },
+  emptyPastTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, fontWeight: '700' },
+  emptyPastSub: { fontFamily: 'Inter_400Regular', fontSize: 14 },
+
+  backToTodayBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20, marginTop: 16,
+  },
+  backToTodayText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, fontWeight: '600' },
+
+  // Write mode
   promptCard: {
-    backgroundColor: Colors.accentBlue, borderRadius: 16, padding: 20,
-    borderWidth: 1, borderColor: Colors.primary + '15', gap: 12,
+    borderRadius: 16, padding: 20,
+    borderWidth: 1, gap: 12,
   },
   promptHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  promptLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.primary, letterSpacing: 1, textTransform: 'uppercase' },
-  promptText: { fontFamily: 'Lora_400Regular_Italic', fontSize: 20, color: Colors.textDark, lineHeight: 28 },
+  promptLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' as any },
+  promptText: { fontFamily: 'Lora_400Regular_Italic', fontSize: 20, lineHeight: 28 },
 
   writingCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
-    borderWidth: 1, borderColor: '#E5E7EB',
+    borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1,
     minHeight: 300,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,
   },
   textarea: {
     flex: 1, padding: 24, minHeight: 250,
-    fontFamily: 'Lora_400Regular_Italic', fontSize: 18, color: '#374151',
+    fontFamily: 'Lora_400Regular_Italic', fontSize: 18,
     lineHeight: 32,
   },
   wordMirrorStrip: {
@@ -232,39 +496,57 @@ const styles = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: '#F3F4F6',
   },
   wordMirrorLabel: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  wordMirrorLabelText: { fontFamily: 'Inter_700Bold', fontSize: 10, color: Colors.primary, letterSpacing: -0.3 },
+  wordMirrorLabelText: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: -0.3 },
   suggestionsScroll: { flexDirection: 'row' },
   suggestionChip: {
     paddingHorizontal: 12, paddingVertical: 4,
-    backgroundColor: Colors.background, borderRadius: 12,
-    borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8,
+    borderRadius: 12,
+    borderWidth: 1, marginRight: 8,
   },
-  suggestionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#6B7280' },
+  suggestionText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+
+  wordMirrorBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  wordMirrorBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, fontWeight: '600' },
 
   tagsSection: { paddingHorizontal: 8, gap: 8 },
-  tagsLabel: { fontFamily: 'Inter_700Bold', fontSize: 11, color: Colors.textMuted, letterSpacing: 2 },
+  tagsLabel: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 2 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   contextTag: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 16, paddingVertical: 8,
-    backgroundColor: '#FFFFFF', borderRadius: 20,
-    borderWidth: 1, borderColor: '#E5E7EB',
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  contextTagActive: { borderColor: Colors.primary + '40', backgroundColor: Colors.primary + '08' },
-  contextTagText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: '#6B7280' },
+  contextTagText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
   addTagBtn: {
     width: 32, height: 32, borderRadius: 16,
-    borderWidth: 2, borderStyle: 'dashed', borderColor: '#D1D5DB',
+    borderWidth: 2, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center',
+  },
+
+  customTagInput: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: 20, borderWidth: 1,
+  },
+  customTagField: {
+    fontFamily: 'Inter_500Medium', fontSize: 14,
+    width: 80, paddingVertical: 4,
   },
 
   emotionBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 24, paddingVertical: 16,
-    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB',
+    borderTopWidth: 1,
+    marginBottom: 100, // Account for floating tab bar
   },
   emotionBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  sensingLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.textMuted, letterSpacing: 2 },
+  sensingLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, letterSpacing: 2 },
   sensedEmotions: { flexDirection: 'row', gap: 8 },
   sensedPill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -272,12 +554,4 @@ const styles = StyleSheet.create({
   },
   sensedDot: { width: 6, height: 6, borderRadius: 3 },
   sensedText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, fontWeight: '600' },
-
-  wordMirrorBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 4,
-    borderRadius: 12, backgroundColor: Colors.primary + '10',
-    borderWidth: 1, borderColor: Colors.primary + '30',
-  },
-  wordMirrorBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, fontWeight: '600' },
 });
