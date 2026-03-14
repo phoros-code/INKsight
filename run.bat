@@ -1,4 +1,5 @@
 @echo off
-echo Starting Voice Agent...
-call "%~dp0venv\Scripts\activate.bat"
+echo Starting Mental Health Companion - Sage...
+call venv_new\Scripts\activate
 python live_agent.py
+pause

@@ -3,7 +3,7 @@ import subprocess
 import os
 import wave
 
-model = whisper.load_model("base")
+model = whisper.load_model("tiny")
 
 def is_valid_wav_file(file_path):
     """Check if the WAV file is valid and not corrupted"""

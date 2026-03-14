@@ -6,3 +6,5 @@ sounddevice
 soundfile
 numpy
 requests
+google-generativeai
+python-dotenv>=1.0.0

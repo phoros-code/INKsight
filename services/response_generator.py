@@ -1,39 +1,34 @@
-import requests
+import os
+import google.generativeai as genai
 
 def generate_response(user_text, emotion):
-
-    prompt = f"""
-You are an emotional support companion.
-
-User emotion: {emotion}
-
-User said: {user_text}
-
-Respond in a supportive and empathetic way.
-"""
+    """
+    Generate an empathetic response using Google Gemini.
+    """
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        print("❌ Error: GEMINI_API_KEY not found in environment variables.")
+        return "I'm here for you, but I'm having trouble connecting to my brain right now."
 
     try:
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "phi3:latest",
-                "prompt": prompt,
-                "stream": False
-            }
-        )
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
-        if response.status_code != 200:
-            print(f"❌ Ollama Error: {response.status_code} - {response.text}")
-            return "I'm here for you."
+        prompt = f"""
+You are an emotional support companion named Sage.
 
-        data = response.json()
+User emotion: {emotion}
+User said: {user_text}
 
-        if "response" in data:
-            return data["response"]
+Respond in a supportive, short, and empathetic way. Keep the response concise for voice interaction.
+"""
+        response = model.generate_content(prompt)
         
-        print(f"⚠️  Unexpected Ollama response: {data}")
-        return "I'm here to listen. Tell me more about how you're feeling."
+        if response and response.text:
+            return response.text.strip()
+        
+        return "I hear you. Tell me more about how you're feeling."
 
     except Exception as e:
-        print("❌ LLM Connection Error:", e)
-        return "I'm here for you."
+        print(f"❌ Gemini Error: {e}")
+        return "I'm here for you. I'm listening."

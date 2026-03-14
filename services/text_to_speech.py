@@ -1,12 +1,14 @@
 import os
 import sounddevice as sd
 import soundfile as sf
-from TTS.api import TTS
-
-# Load TTS model once at module level
 try:
+    from TTS.api import TTS
+    # Load TTS model once at module level
     tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC")
     print("✅ TTS model loaded.")
+except ImportError:
+    print("❌ TTS package not installed. Speech output will be disabled.")
+    tts = None
 except Exception as e:
     print(f"❌ Failed to load TTS model: {e}")
     tts = None
