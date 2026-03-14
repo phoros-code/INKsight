@@ -88,13 +88,20 @@ export async function checkHealth(): Promise<HealthStatus> {
 export async function transcribeAudio(audioUri: string): Promise<string> {
   const formData = new FormData();
   
-  // React Native needs this specific format for file uploads
-  const fileObj: any = {
-    uri: audioUri,
-    type: 'audio/wav',
-    name: 'recording.wav',
-  };
-  formData.append('file', fileObj);
+  if (Platform.OS === 'web') {
+    // On web, audioUri is a blob URL. We must fetch it and append the real Blob.
+    const blobResponse = await fetch(audioUri);
+    const audioBlob = await blobResponse.blob();
+    formData.append('file', audioBlob, 'recording.webm');
+  } else {
+    // React Native needs this specific format for file uploads
+    const fileObj: any = {
+      uri: audioUri,
+      type: 'audio/wav',
+      name: 'recording.wav',
+    };
+    formData.append('file', fileObj);
+  }
 
   const response = await fetchWithTimeout(`${BASE_URL}/transcribe`, {
     method: 'POST',

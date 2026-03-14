@@ -255,6 +255,24 @@ export default function VoiceAgentScreen() {
             }
           });
           return; // Don't set idle yet, wait for playback
+        } else {
+          // Native Web Audio playback
+          const audio = new Audio(audioUri);
+          
+          audio.onended = () => {
+            setOrbState('idle');
+            setStatusText('Tap the orb to speak');
+            // Clean up the blob URL to prevent memory leaks
+            URL.revokeObjectURL(audioUri);
+          };
+          
+          audio.onerror = () => {
+            setOrbState('idle');
+            setStatusText('Tap the orb to speak');
+          };
+          
+          await audio.play();
+          return; // Wait for playback to finish via the onended callback
         }
       } catch {
         // TTS failed, but we still showed the text response
