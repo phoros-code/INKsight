@@ -1,0 +1,49 @@
+Folder PATH listing for volume Windows
+Volume serial number is 785E-E692
+C:\USERS\HIREN\ONEDRIVE\DESKTOP\ME\HACKCRUX\INKSIGHT\SRC
++---components
+|   +---home
+|   |       InsightCard.tsx
+|   |       MoodOrb.tsx
+|   |       WeekStrip.tsx
+|   |       
+|   +---insights
+|   |       EmotionLineChart.tsx
+|   |       PatternCard.tsx
+|   |       RadarChart.tsx
+|   |       
+|   +---journal
+|   |       EmotionDetectionBar.tsx
+|   |       JournalEditor.tsx
+|   |       WordMirrorSheet.tsx
+|   |       
+|   \---ui
+|           BreathingCircle.tsx
+|           Button.tsx
+|           Card.tsx
+|           EmotionPill.tsx
+|           FloatingTabBar.tsx
+|           
++---constants
+|       colors.ts
+|       emotions.ts
+|       typography.ts
+|       
++---database
+|       checkinDB.ts
+|       journalDB.ts
+|       schema.ts
+|       
++---hooks
+|       useEmotions.ts
+|       useInsights.ts
+|       useJournal.ts
+|       
++---services
+|       insightGenerator.ts
+|       nlpService.ts
+|       patternEngine.ts
+|       
+\---types
+        index.ts
+        
