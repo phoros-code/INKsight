@@ -26,8 +26,8 @@
 - [x] Wire audio recording (expo-av) into the voice agent flow
 - [x] Add Sage entry point to Quick Actions grid on Home
 - [x] Theme-aware styling matching INKsight's design system
-- [ ] Connect to existing emotion detection in `nlpService.ts`
-- [ ] Store voice journal entries in the journal DB
+- [x] Connect to existing emotion detection in `nlpService.ts`
+- [x] Store voice journal entries in the journal DB
 
 ## Phase 5: Verification
 - [x] Web export builds successfully (no errors, deployment safe)

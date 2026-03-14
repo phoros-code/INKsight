@@ -14,6 +14,8 @@ import { useTheme } from '../../constants/ThemeContext';
 import VoiceOrb, { OrbState } from './VoiceOrb';
 import TranscriptBubble from './TranscriptBubble';
 import * as VoiceAgent from '../../services/voiceAgentService';
+import * as nlpService from '../../services/nlpService';
+import * as journalDB from '../../database/journalDB';
 
 // ── Types ────────────────────────────────────────────────────
 interface Message {
@@ -23,6 +25,7 @@ interface Message {
   emotion?: string;
   timestamp: Date;
 }
+
 
 // ── Component ────────────────────────────────────────────────
 export default function VoiceAgentScreen() {
@@ -186,13 +189,42 @@ export default function VoiceAgentScreen() {
       // ── 2. Detect emotion ────────────────────────────────
       setStatusText('Sensing your emotion...');
       let emotion = 'neutral';
+      let emotionColor = '#A8B8C8';
+      
       try {
         emotion = await VoiceAgent.detectEmotion(transcription);
+        const colorMap: Record<string, string> = {
+          joy: '#F0C070', sadness: '#89ABD4', anger: '#D4896A',
+          fear: '#C4A4C0', disgust: '#A8B8B0', surprise: '#F0B87C', neutral: '#A8B8C8'
+        };
+        emotionColor = colorMap[emotion] || colorMap.neutral;
       } catch {
-        // Fallback to neutral, don't block the flow
+        // Fallback to local NLP service
+        try {
+          const analysis = await nlpService.analyzeText(transcription);
+          emotion = analysis.dominantEmotion;
+          emotionColor = analysis.dominantColor;
+        } catch {
+          // Absolute fallback
+        }
       }
 
-      // ── 3. Generate response ─────────────────────────────
+      // ── 3. Save to Journal DB ────────────────────────────
+      try {
+        await journalDB.insertEntry(null, {
+          content: transcription,
+          wordCount: transcription.trim().split(/\s+/).length,
+          detectedEmotions: [{ emotion, score: 1.0, color: emotionColor }],
+          dominantEmotion: { emotion, score: 1.0, color: emotionColor },
+          tags: ['Voice Journal'],
+          moodScore: 6,
+          promptUsed: 'Talked to Sage',
+        });
+      } catch (e) {
+        console.warn('Failed to save voice journal to DB', e);
+      }
+
+      // ── 4. Generate response ─────────────────────────────
       setStatusText('Sage is thinking...');
       let aiResponse: string;
       try {
@@ -203,7 +235,7 @@ export default function VoiceAgentScreen() {
 
       addMessage(aiResponse, 'sage', emotion);
 
-      // ── 4. Speak response ────────────────────────────────
+      // ── 5. Speak response ────────────────────────────────
       setOrbState('speaking');
       setStatusText('Sage is speaking...');
       try {
