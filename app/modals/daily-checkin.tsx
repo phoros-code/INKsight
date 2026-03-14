@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
+import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { webStore } from '../../src/database/webDataStore';
 
@@ -17,6 +18,7 @@ const FOCUS_OPTIONS = ['Mindfulness', 'Creativity', 'Physical Health', 'Work-Lif
 
 export default function DailyCheckinModal() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [energy, setEnergy] = useState(2); // index
   const [focus, setFocus] = useState('Creativity');
   const [note, setNote] = useState('');
@@ -38,21 +40,21 @@ export default function DailyCheckinModal() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <MaterialIcons name="close" size={24} color={Colors.textDark} />
+        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: theme.card }]} onPress={() => router.back()}>
+          <MaterialIcons name="close" size={24} color={theme.textMain} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Daily Check-In</Text>
+        <Text style={[styles.headerTitle, { color: theme.textMain }]}>Daily Check-In</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Question */}
         <View style={styles.questionSection}>
-          <Text style={styles.questionTitle}>How are you feeling today?</Text>
-          <Text style={styles.questionSub}>Step into your INKsight journey.</Text>
+          <Text style={[styles.questionTitle, { color: theme.textMain }]}>How are you feeling today?</Text>
+          <Text style={[styles.questionSub, { color: theme.primary }]}>Step into your INKsight journey.</Text>
         </View>
 
         {/* Energy Level */}
@@ -97,12 +99,12 @@ export default function DailyCheckinModal() {
         </View>
 
         {/* Notes */}
-        <View style={styles.glassCard}>
-          <Text style={styles.cardLabel}>QUICK NOTE</Text>
+        <View style={[styles.glassCard, { backgroundColor: theme.isDark ? theme.card : '#FFFFFF66', borderColor: theme.isDark ? '#FFFFFF15' : '#FFFFFF4D' }]}>
+          <Text style={[styles.cardLabel, { color: theme.textMuted }]}>QUICK NOTE</Text>
           <TextInput
-            style={styles.noteInput}
+            style={[styles.noteInput, { color: theme.textMain, backgroundColor: theme.isDark ? theme.background : '#FFFFFF80' }]}
             placeholder="What's on your mind?"
-            placeholderTextColor={Colors.textDark + '66'}
+            placeholderTextColor={theme.textMuted + '66'}
             multiline
             value={note}
             onChangeText={setNote}
@@ -110,8 +112,8 @@ export default function DailyCheckinModal() {
         </View>
 
         {/* Save Button */}
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.9}>
-          <Text style={styles.saveBtnText}>{saved ? '✓ Saved!' : 'Save Check-In'}</Text>
+        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSave} activeOpacity={0.9}>
+          <Text style={[styles.saveBtnText, { color: theme.primaryButtonText }]}>{saved ? '✓ Saved!' : 'Save Check-In'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

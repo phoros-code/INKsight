@@ -25,7 +25,7 @@ export default function HomeScreen() {
       setEntryCount(count);
       const s = Platform.OS === 'web' ? webStore.getStreakCount() : await journalDB.getStreakCount(null);
       setStreak(s);
-      const latest = Platform.OS === 'web' ? webStore.getLatestEntry() : await journalDB.getLatestEntry(null);
+      const latest: any = Platform.OS === 'web' ? webStore.getLatestEntry() : await journalDB.getLatestEntry(null);
       if (latest) {
         setLatestEntry(latest);
         const de = typeof latest.detected_emotions === 'string'
@@ -177,6 +177,56 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Quick Actions */}
+        <View style={styles.quickActionsSection}>
+          <Text style={[styles.quickActionsTitle, { color: textMain }]}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => router.push('/modals/daily-checkin' as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#FEF3C7' }]}>
+                <MaterialIcons name="wb-sunny" size={22} color="#F59E0B" />
+              </View>
+              <Text style={[styles.quickActionLabel, { color: textMain }]}>Daily{"\n"}Check-In</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => router.push('/modals/emotion-wheel' as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: primary + '20' }]}>
+                <MaterialIcons name="donut-large" size={22} color={primary} />
+              </View>
+              <Text style={[styles.quickActionLabel, { color: textMain }]}>Emotion{"\n"}Wheel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => router.push('/modals/safe-space' as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#DBEAFE' }]}>
+                <MaterialIcons name="favorite" size={22} color="#3B82F6" />
+              </View>
+              <Text style={[styles.quickActionLabel, { color: textMain }]}>Safe{"\n"}Space</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => router.push('/modals/weekly-summary' as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#EDE9FE' }]}>
+                <MaterialIcons name="auto-awesome" size={22} color="#8B5CF6" />
+              </View>
+              <Text style={[styles.quickActionLabel, { color: textMain }]}>Weekly{"\n"}Summary</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Latest Entry */}
         <View style={styles.latestSection}>
           <Text style={[styles.latestTitle, { color: textMain }]}>Latest Entry</Text>
@@ -281,4 +331,18 @@ const styles = StyleSheet.create({
   },
   latestTime: { fontFamily: 'Inter_400Regular', fontSize: 12, marginBottom: 4 },
   latestText: { fontFamily: 'Lora_400Regular', fontSize: 14, lineHeight: 22 },
+
+  quickActionsSection: { marginHorizontal: 24, marginTop: 20, gap: 12 },
+  quickActionsTitle: { fontFamily: 'Nunito_700Bold', fontSize: 16, fontWeight: '700' },
+  quickActionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  quickActionCard: {
+    width: '47%' as any, borderRadius: 16, padding: 16, gap: 12,
+    borderWidth: 1, alignItems: 'flex-start',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+  },
+  quickActionIcon: {
+    width: 44, height: 44, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  quickActionLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, fontWeight: '600', lineHeight: 18 },
 });

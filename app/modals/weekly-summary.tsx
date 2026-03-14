@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
+import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { webStore } from '../../src/database/webDataStore';
 
 export default function WeeklySummaryModal() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [stats, setStats] = useState({ entries: 12, words: '4.2k', avgTime: '15m' });
   const [bestSentence, setBestSentence] = useState(
     '"The stars don\'t just exist to be seen; they exist to remind us that even the smallest light matters in a vast dark sky."'
@@ -44,7 +46,7 @@ export default function WeeklySummaryModal() {
   const dateRange = `${months[weekAgo.getMonth()]} ${weekAgo.getDate()} – ${today.getDate()}, ${today.getFullYear()}`;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.isDark ? theme.background : Colors.darkBg }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>

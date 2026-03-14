@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
+import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Svg, Path } from 'react-native-svg';
 
@@ -18,13 +19,14 @@ const EMOTIONS = [
 
 export default function EmotionWheelModal() {
   const router = useRouter();
-  const [selected, setSelected] = useState(4); // Sadness
+  const { theme } = useTheme();
+  const [selected, setSelected] = useState(4);
   const [selectedSub, setSelectedSub] = useState('melancholic');
 
   const currentEmotion = EMOTIONS[selected];
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.isDark ? theme.background : Colors.darkBg }]}>
       {/* Top Nav */}
       <View style={styles.topNav}>
         <TouchableOpacity style={styles.navBtn} onPress={() => router.back()}>
@@ -105,8 +107,8 @@ export default function EmotionWheelModal() {
         </View>
 
         {/* Actions */}
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()} activeOpacity={0.9}>
-          <Text style={styles.primaryBtnText}>Add to Journal</Text>
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.primary, shadowColor: theme.primary }]} onPress={() => router.back()} activeOpacity={0.9}>
+          <Text style={[styles.primaryBtnText, { color: theme.primaryButtonText }]}>Add to Journal</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.skipText}>Skip for now</Text>

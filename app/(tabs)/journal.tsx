@@ -129,6 +129,14 @@ export default function JournalScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            <TouchableOpacity
+              style={styles.wordMirrorBtn}
+              onPress={() => router.push('/modals/word-mirror' as any)}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons name="psychology" size={16} color={theme.primary} />
+              <Text style={[styles.wordMirrorBtnText, { color: theme.primary }]}>Word Mirror</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -154,7 +162,11 @@ export default function JournalScreen() {
       </ScrollView>
 
       {/* Bottom Emotion Detection Bar */}
-      <View style={styles.emotionBar}>
+      <TouchableOpacity
+        style={styles.emotionBar}
+        onPress={() => router.push('/modals/emotion-wheel' as any)}
+        activeOpacity={0.8}
+      >
         <View style={styles.emotionBarLeft}>
           <Text style={styles.sensingLabel}>SENSING:</Text>
           <View style={styles.sensedEmotions}>
@@ -166,8 +178,11 @@ export default function JournalScreen() {
             ))}
           </View>
         </View>
-        <MaterialIcons name="bubble-chart" size={24} color={Colors.primary + '80'} />
-      </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: theme.primary }}>Explore</Text>
+          <MaterialIcons name="chevron-right" size={18} color={theme.primary} />
+        </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -257,4 +272,12 @@ const styles = StyleSheet.create({
   },
   sensedDot: { width: 6, height: 6, borderRadius: 3 },
   sensedText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, fontWeight: '600' },
+
+  wordMirrorBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 12, backgroundColor: Colors.primary + '10',
+    borderWidth: 1, borderColor: Colors.primary + '30',
+  },
+  wordMirrorBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 11, fontWeight: '600' },
 });

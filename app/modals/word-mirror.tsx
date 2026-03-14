@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
+import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const WORD_CARDS = [
@@ -23,9 +24,10 @@ const WORD_CARDS = [
 
 export default function WordMirrorModal() {
   const router = useRouter();
+  const { theme } = useTheme();
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Background content (dimmed) */}
       <View style={styles.bgContent}>
         <View style={styles.bgHeader}>
@@ -45,7 +47,7 @@ export default function WordMirrorModal() {
       <View style={styles.overlay} />
 
       {/* Bottom Sheet */}
-      <View style={styles.bottomSheet}>
+      <View style={[styles.bottomSheet, { backgroundColor: theme.card }]}>
         {/* Handle */}
         <View style={styles.handleRow}>
           <View style={styles.handle} />
@@ -56,7 +58,7 @@ export default function WordMirrorModal() {
           <TouchableOpacity onPress={() => router.back()}>
             <MaterialIcons name="close" size={24} color="#94A3B8" />
           </TouchableOpacity>
-          <Text style={styles.sheetTitle}>Word Mirror ✨</Text>
+          <Text style={[styles.sheetTitle, { color: theme.textMain }]}>Word Mirror ✨</Text>
           <TouchableOpacity>
             <MaterialIcons name="auto-fix-high" size={24} color={Colors.accent} />
           </TouchableOpacity>
@@ -110,10 +112,10 @@ export default function WordMirrorModal() {
         </ScrollView>
 
         {/* Bottom Action */}
-        <View style={styles.sheetFooter}>
-          <TouchableOpacity style={styles.addBtn} onPress={() => router.back()} activeOpacity={0.9}>
-            <MaterialIcons name="draw" size={20} color="#FFF" />
-            <Text style={styles.addBtnText}>Add to Entry</Text>
+        <View style={[styles.sheetFooter, { backgroundColor: theme.card + 'CC' }]}>
+          <TouchableOpacity style={[styles.addBtn, { backgroundColor: theme.primary, shadowColor: theme.primary }]} onPress={() => router.back()} activeOpacity={0.9}>
+            <MaterialIcons name="draw" size={20} color={theme.primaryButtonText} />
+            <Text style={[styles.addBtnText, { color: theme.primaryButtonText }]}>Add to Entry</Text>
           </TouchableOpacity>
         </View>
       </View>
