@@ -26,6 +26,13 @@ export default function ModalsLayout() {
           animation: 'fade',
         }}
       />
+      <Stack.Screen 
+        name="voice-agent" 
+        options={{ 
+          animation: 'slide_from_bottom',
+          contentStyle: { backgroundColor: theme.background },
+        }} 
+      />
     </Stack>
   );
 }

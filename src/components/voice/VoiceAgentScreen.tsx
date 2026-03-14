@@ -1,0 +1,408 @@
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+  Alert,
+} from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useTheme } from '../../constants/ThemeContext';
+import VoiceOrb, { OrbState } from './VoiceOrb';
+import TranscriptBubble from './TranscriptBubble';
+import * as VoiceAgent from '../../services/voiceAgentService';
+
+// ── Types ────────────────────────────────────────────────────
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'sage';
+  emotion?: string;
+  timestamp: Date;
+}
+
+// ── Component ────────────────────────────────────────────────
+export default function VoiceAgentScreen() {
+  const router = useRouter();
+  const { theme } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+
+  const [orbState, setOrbState] = useState<OrbState>('idle');
+  const [statusText, setStatusText] = useState('Tap the orb to speak');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+  const recordingRef = useRef<any>(null);
+
+  // Auto-scroll to bottom when messages change
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+  }, []);
+
+  // ── Check server health ──────────────────────────────────
+  const checkServer = useCallback(async () => {
+    try {
+      const health = await VoiceAgent.checkHealth();
+      setServerOnline(health.status === 'ok');
+      return true;
+    } catch {
+      setServerOnline(false);
+      setStatusText('⚠️ Server offline. Start the voice-agent-server.');
+      return false;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    checkServer();
+  }, [checkServer]);
+
+  // ── Add message helper ───────────────────────────────────
+  const addMessage = useCallback((text: string, sender: 'user' | 'sage', emotion?: string) => {
+    const msg: Message = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2),
+      text,
+      sender,
+      emotion,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, msg]);
+    scrollToBottom();
+    return msg;
+  }, [scrollToBottom]);
+
+  // ── Handle orb tap ───────────────────────────────────────
+  const handleOrbPress = useCallback(async () => {
+    if (orbState === 'listening') {
+      // Stop recording
+      await stopRecording();
+      return;
+    }
+
+    if (orbState !== 'idle') return; // Don't interrupt processing/speaking
+
+    // Check server first
+    const online = await checkServer();
+    if (!online) return;
+
+    await startRecording();
+  }, [orbState, checkServer]);
+
+  // ── Start recording ──────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      // Dynamic import for expo-av (not available on web easily)
+      const { Audio } = require('expo-av');
+
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Required', 'Microphone access is needed for Sage to hear you.');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync({
+        android: {
+          extension: '.wav',
+          outputFormat: 3, // THREE_GPP
+          audioEncoder: 1, // AMR_NB replaced by default
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.wav',
+          audioQuality: 127, // MAX
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      } as any);
+
+      await recording.startAsync();
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setOrbState('listening');
+      setStatusText('Listening... Tap again to stop');
+    } catch (error: any) {
+      console.error('Recording error:', error);
+      setStatusText('Failed to start recording');
+      setOrbState('idle');
+    }
+  };
+
+  // ── Stop recording & process ─────────────────────────────
+  const stopRecording = async () => {
+    if (!recordingRef.current) return;
+
+    try {
+      setOrbState('processing');
+      setStatusText('Processing your voice...');
+
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      setIsRecording(false);
+
+      if (!uri) {
+        setStatusText('No audio captured. Try again.');
+        setOrbState('idle');
+        return;
+      }
+
+      // ── 1. Transcribe ────────────────────────────────────
+      setStatusText('Transcribing...');
+      let transcription: string;
+      try {
+        transcription = await VoiceAgent.transcribeAudio(uri);
+      } catch (e: any) {
+        setStatusText('Transcription failed. Try again.');
+        setOrbState('idle');
+        return;
+      }
+
+      if (!transcription.trim()) {
+        setStatusText("Couldn't hear you clearly. Try again.");
+        setOrbState('idle');
+        return;
+      }
+
+      addMessage(transcription, 'user');
+
+      // ── 2. Detect emotion ────────────────────────────────
+      setStatusText('Sensing your emotion...');
+      let emotion = 'neutral';
+      try {
+        emotion = await VoiceAgent.detectEmotion(transcription);
+      } catch {
+        // Fallback to neutral, don't block the flow
+      }
+
+      // ── 3. Generate response ─────────────────────────────
+      setStatusText('Sage is thinking...');
+      let aiResponse: string;
+      try {
+        aiResponse = await VoiceAgent.generateResponse(transcription, emotion);
+      } catch (e: any) {
+        aiResponse = "I hear you. I'm having trouble finding the right words right now, but I'm here.";
+      }
+
+      addMessage(aiResponse, 'sage', emotion);
+
+      // ── 4. Speak response ────────────────────────────────
+      setOrbState('speaking');
+      setStatusText('Sage is speaking...');
+      try {
+        const audioUri = await VoiceAgent.speakText(aiResponse);
+        
+        // Play the audio
+        if (Platform.OS !== 'web') {
+          const { Audio } = require('expo-av');
+          const { sound } = await Audio.Sound.createAsync({ uri: audioUri });
+          await sound.playAsync();
+          // Wait for playback to finish
+          sound.setOnPlaybackStatusUpdate((status: any) => {
+            if (status.didJustFinish) {
+              sound.unloadAsync();
+              setOrbState('idle');
+              setStatusText('Tap the orb to speak');
+            }
+          });
+          return; // Don't set idle yet, wait for playback
+        }
+      } catch {
+        // TTS failed, but we still showed the text response
+      }
+
+      setOrbState('idle');
+      setStatusText('Tap the orb to speak');
+    } catch (error: any) {
+      console.error('Processing error:', error);
+      setStatusText('Something went wrong. Try again.');
+      setOrbState('idle');
+    }
+  };
+
+  // ── Theme colors ─────────────────────────────────────────
+  const bg = theme.background;
+  const textMain = theme.textMain;
+  const textMuted = theme.textMuted;
+  const primary = theme.primary;
+  const cardBg = theme.card;
+  const isDark = theme.isDark;
+
+  return (
+    <View style={[styles.container, { backgroundColor: bg }]}>  
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
+          <MaterialIcons name="close" size={24} color={textMain} />
+        </TouchableOpacity>
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: textMain }]}>Sage</Text>
+          <View style={styles.headerSubRow}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: serverOnline ? '#22C55E' : serverOnline === false ? '#EF4444' : '#F59E0B' },
+              ]}
+            />
+            <Text style={[styles.headerSubtitle, { color: textMuted }]}>
+              {serverOnline ? 'Voice companion' : serverOnline === false ? 'Offline' : 'Connecting...'}
+            </Text>
+          </View>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
+      {/* Transcript area */}
+      <ScrollView
+        ref={scrollRef}
+        style={styles.transcriptArea}
+        contentContainerStyle={styles.transcriptContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {messages.length === 0 && (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="record-voice-over" size={48} color={textMuted + '40'} />
+            <Text style={[styles.emptyTitle, { color: textMuted }]}>Talk to Sage</Text>
+            <Text style={[styles.emptySubtitle, { color: textMuted + '99' }]}>
+              Your AI emotional support companion.{'\n'}Tap the orb below to start a conversation.
+            </Text>
+          </View>
+        )}
+        {messages.map(msg => (
+          <TranscriptBubble key={msg.id} text={msg.text} sender={msg.sender} emotion={msg.emotion} theme={theme} />
+        ))}
+      </ScrollView>
+
+      {/* Orb & controls */}
+      <View style={[styles.controlArea, { backgroundColor: isDark ? cardBg : '#F8FAFC' }]}>
+        <Text style={[styles.statusText, { color: textMuted }]}>{statusText}</Text>
+        <TouchableOpacity
+          onPress={handleOrbPress}
+          activeOpacity={0.85}
+          disabled={orbState === 'processing'}
+          style={styles.orbTouchable}
+        >
+          <VoiceOrb state={orbState} primaryColor={primary} />
+        </TouchableOpacity>
+        <Text style={[styles.hintText, { color: textMuted + '80' }]}>
+          {orbState === 'idle' ? 'Sage listens, understands, and responds' : ''}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Styles ─────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'web' ? 16 : 52,
+    paddingBottom: 12,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  headerSubtitle: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+  },
+  transcriptArea: {
+    flex: 1,
+  },
+  transcriptContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexGrow: 1,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  emptySubtitle: {
+    fontFamily: 'Lora_400Regular',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 32,
+  },
+  controlArea: {
+    alignItems: 'center',
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'web' ? 32 : 48,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  statusText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  orbTouchable: {
+    padding: 8,
+  },
+  hintText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    marginTop: 4,
+  },
+});

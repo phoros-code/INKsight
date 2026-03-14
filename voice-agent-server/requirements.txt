@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv>=1.0.0
+torch
+transformers
+openai-whisper
+TTS
+soundfile
+numpy
+google-generativeai

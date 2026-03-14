@@ -245,6 +245,17 @@ export default function HomeScreen() {
               </View>
               <Text style={[styles.quickActionLabel, { color: textMain }]}>Weekly{"\n"}Summary</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickActionCard, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => router.push('/modals/voice-agent' as any)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.quickActionIcon, { backgroundColor: '#E0F2FE' }]}>
+                <MaterialIcons name="record-voice-over" size={22} color="#0EA5E9" />
+              </View>
+              <Text style={[styles.quickActionLabel, { color: textMain }]}>Talk to{"\n"}Sage</Text>
+            </TouchableOpacity>
           </View>
         </View>
 

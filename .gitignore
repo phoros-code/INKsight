@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Voice agent server (Python backend)
+voice-agent-server/venv/
+voice-agent-server/__pycache__/
+voice-agent-server/audio/
+voice-agent-server/.env
+voice-agent-server/services/__pycache__/
