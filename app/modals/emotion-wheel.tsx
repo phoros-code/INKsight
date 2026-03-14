@@ -29,24 +29,13 @@ export default function EmotionWheelModal() {
 
   const handleAddToJournal = () => {
     if (Platform.OS === 'web') {
-      const dateStr = new Date().toISOString().split('T')[0];
       const emotions = [
         { emotion: selectedSub, score: 0.9, color: currentEmotion.color },
         { emotion: currentEmotion.name.toLowerCase(), score: 0.8, color: currentEmotion.color },
       ];
-      const content = `Feeling ${selectedSub} — a shade of ${currentEmotion.name.toLowerCase()}.`;
-      webStore.insertEntry({
-        date: dateStr,
-        created_at: new Date().toISOString(),
-        content,
-        word_count: content.split(/\s+/).length,
-        detected_emotions: JSON.stringify(emotions),
-        dominant_emotion: JSON.stringify(emotions[0]),
-        tags: JSON.stringify(['Emotion Wheel']),
-        mood_score: selected <= 1 || selected === 7 ? 7 : selected >= 4 && selected <= 6 ? 3 : 5,
-        prompt_used: 'Emotion Wheel',
-        linguistic_score: null,
-      });
+      try {
+        localStorage.setItem('inksight_temp_emotions', JSON.stringify(emotions));
+      } catch {}
     }
     router.back();
   };

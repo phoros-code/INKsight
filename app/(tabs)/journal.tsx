@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -59,9 +59,12 @@ export default function JournalScreen() {
   const [customTag, setCustomTag] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [allTags, setAllTags] = useState(CONTEXT_TAGS);
+  const [manualEmotion, setManualEmotion] = useState(false);
 
   // Calendar mode
   const [calendarDates] = useState(() => generateDateRange(90));
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+  const displayedDates = calendarExpanded ? calendarDates : calendarDates.slice(-7);
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [isViewingPast, setIsViewingPast] = useState(false);
@@ -99,9 +102,25 @@ export default function JournalScreen() {
     }
   }, [selectedDate]);
 
+  // Fetch temporary emotions on focus
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web') {
+        try {
+          const temp = localStorage.getItem('inksight_temp_emotions');
+          if (temp) {
+            setDetectedEmotions(JSON.parse(temp));
+            setManualEmotion(true);
+            localStorage.removeItem('inksight_temp_emotions');
+          }
+        } catch {}
+      }
+    }, [])
+  );
+
   // Emotion detection
   useEffect(() => {
-    if (!content || isViewingPast) return;
+    if (!content || isViewingPast || manualEmotion) return;
     const lower = content.toLowerCase();
     const found: { emotion: string; color: string }[] = [];
     if (lower.includes('peace') || lower.includes('calm') || lower.includes('quiet')) found.push({ emotion: 'calm', color: Colors.sage });
@@ -111,7 +130,7 @@ export default function JournalScreen() {
     if (lower.includes('hope') || lower.includes('better') || lower.includes('looking forward')) found.push({ emotion: 'hopeful', color: '#90C49A' });
     if (lower.includes('think') || lower.includes('wonder') || lower.includes('reflect')) found.push({ emotion: 'pensive', color: '#89ABD4' });
     if (found.length > 0) setDetectedEmotions(found.slice(0, 3));
-  }, [content, isViewingPast]);
+  }, [content, isViewingPast, manualEmotion]);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -180,51 +199,56 @@ export default function JournalScreen() {
       </View>
 
       {/* Calendar Date Strip */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.calendarStrip}
-        style={styles.calendarContainer}
-      >
-        {calendarDates.map(({ date, dateStr }) => {
-          const isToday = dateStr === todayStr;
-          const isSelected = dateStr === selectedDate;
-          const hasEntry = entryDates.has(dateStr);
-          return (
-            <TouchableOpacity
-              key={dateStr}
-              style={[
-                styles.calendarDay,
-                { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF0D' : '#0000000A' },
-                isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
-              ]}
-              onPress={() => setSelectedDate(dateStr)}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.calendarDayName,
-                { color: theme.textMuted },
-                isSelected && { color: theme.primaryButtonText },
-              ]}>
-                {DAYS_SHORT[date.getDay()]}
-              </Text>
-              <Text style={[
-                styles.calendarDayNum,
-                { color: theme.textMain },
-                isSelected && { color: theme.primaryButtonText },
-              ]}>
-                {date.getDate()}
-              </Text>
-              {hasEntry && !isSelected && (
-                <View style={[styles.calendarDot, { backgroundColor: theme.primary }]} />
-              )}
-              {isToday && !isSelected && (
-                <View style={[styles.calendarDot, { backgroundColor: '#F59E0B' }]} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.calendarWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.calendarStrip}
+          style={styles.calendarContainer}
+        >
+          {displayedDates.map(({ date, dateStr }) => {
+            const isToday = dateStr === todayStr;
+            const isSelected = dateStr === selectedDate;
+            const hasEntry = entryDates.has(dateStr);
+            return (
+              <TouchableOpacity
+                key={dateStr}
+                style={[
+                  styles.calendarDay,
+                  { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF0D' : '#0000000A' },
+                  isSelected && { backgroundColor: theme.primary, borderColor: theme.primary },
+                ]}
+                onPress={() => setSelectedDate(dateStr)}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.calendarDayName,
+                  { color: theme.textMuted },
+                  isSelected && { color: theme.primaryButtonText },
+                ]}>
+                  {DAYS_SHORT[date.getDay()]}
+                </Text>
+                <Text style={[
+                  styles.calendarDayNum,
+                  { color: theme.textMain },
+                  isSelected && { color: theme.primaryButtonText },
+                ]}>
+                  {date.getDate()}
+                </Text>
+                {hasEntry && !isSelected && (
+                  <View style={[styles.calendarDot, { backgroundColor: theme.primary }]} />
+                )}
+                {isToday && !isSelected && (
+                  <View style={[styles.calendarDot, { backgroundColor: '#F59E0B' }]} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <TouchableOpacity style={[styles.expandCalendarBtn, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF0D' : '#0000000A' }]} onPress={() => setCalendarExpanded(!calendarExpanded)}>
+          <MaterialIcons name={calendarExpanded ? "chevron-right" : "chevron-left"} size={24} color={theme.textMuted} />
+        </TouchableOpacity>
+      </View>
 
       {isViewingPast ? (
         /* Past Entry View */
@@ -424,7 +448,8 @@ const styles = StyleSheet.create({
   saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, fontWeight: '600' },
 
   // Calendar Strip
-  calendarContainer: { maxHeight: 80, flexGrow: 0 },
+  calendarWrapper: { flexDirection: 'row', alignItems: 'center', paddingRight: 16, width: '100%' },
+  calendarContainer: { maxHeight: 80, flex: 1 },
   calendarStrip: { paddingHorizontal: 16, gap: 8, paddingBottom: 8 },
   calendarDay: {
     width: 52, height: 66, borderRadius: 16,
@@ -434,6 +459,7 @@ const styles = StyleSheet.create({
   calendarDayName: { fontFamily: 'Inter_400Regular', fontSize: 10 },
   calendarDayNum: { fontFamily: 'Inter_700Bold', fontSize: 18, fontWeight: '700' },
   calendarDot: { width: 5, height: 5, borderRadius: 3 },
+  expandCalendarBtn: { width: 40, height: 66, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
 
   mainScroll: { flex: 1 },
   mainContent: { paddingHorizontal: 16, gap: 16 },

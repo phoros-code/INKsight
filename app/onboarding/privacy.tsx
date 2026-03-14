@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
@@ -6,6 +6,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 export default function PrivacyScreen() {
   const router = useRouter();
+  const [showInfo, setShowInfo] = useState(false);
 
   const features = [
     { icon: 'shield' as const, title: 'End-to-end encrypted locally', desc: 'Your private data is never readable by others' },
@@ -68,9 +69,21 @@ export default function PrivacyScreen() {
         >
           <Text style={styles.primaryButtonText}>I Feel Safe Here</Text>
         </TouchableOpacity>
-        <TouchableOpacity>
-          <Text style={styles.linkText}>How does this work?</Text>
+        <TouchableOpacity onPress={() => setShowInfo(!showInfo)}>
+          <Text style={styles.linkText}>{showInfo ? 'Hide details' : 'How does this work?'}</Text>
         </TouchableOpacity>
+
+        {showInfo && (
+          <View style={styles.infoBox}>
+            <Text style={styles.infoText}>
+              INKsight uses your device's secure local storage to save your entries. 
+              We don't have servers, so your data physically cannot be accessed by us or anyone else. 
+              Your mind remains your own private sanctuary.
+            </Text>
+          </View>
+        )}
+
+        <Text style={styles.copyrightText}>Copyright © 2026 INKsight</Text>
       </View>
     </View>
   );
@@ -210,5 +223,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.primary,
     textDecorationLine: 'underline',
+  },
+  infoBox: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  infoText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: Colors.textDark,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  copyrightText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 24,
+    textAlign: 'center',
   },
 });

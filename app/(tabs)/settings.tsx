@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput, Platform, Linking, Image } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { webStore } from '../../src/database/webDataStore';
 import { seedWebDemoData } from '../../src/utils/seedDemoData';
 import { useTheme, THEMES, ThemeName } from '../../src/constants/ThemeContext';
@@ -15,6 +17,7 @@ function setLS(key: string, val: any) {
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { theme, themeName, setTheme } = useTheme();
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [demoLoaded, setDemoLoaded] = useState(false);
@@ -28,9 +31,11 @@ export default function SettingsScreen() {
   const [editingName, setEditingName] = useState(false);
   const [profilePic, setProfilePic] = useState<string | null>(() => getLS('inksight_pfp', null));
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [remindersEnabled, setRemindersEnabled] = useState(() => getLS('inksight_reminders', false));
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ─── Passcode State ──────────────────────
+  const passcodeRef = useRef<TextInput | null>(null);
   const [passcodeEnabled, setPasscodeEnabled] = useState(() => getLS('inksight_passcode_enabled', false));
   const [showPasscodeSetup, setShowPasscodeSetup] = useState(false);
   const [passcodeInput, setPasscodeInput] = useState('');
@@ -78,7 +83,7 @@ export default function SettingsScreen() {
   };
 
   // Logout handler
-  const handleLogout = () => {
+  const handleLogout = async () => {
     webStore.clearAll();
     try {
       localStorage.removeItem('inksight_demo_seeded');
@@ -87,8 +92,9 @@ export default function SettingsScreen() {
       localStorage.removeItem('inksight_passcode');
       localStorage.removeItem('inksight_passcode_enabled');
       localStorage.removeItem('inksight_locked');
+      await AsyncStorage.removeItem('onboarding_complete');
     } catch {}
-    setTimeout(() => window.location.reload(), 300);
+    router.replace('/splash');
   };
 
   // Passcode handlers
@@ -104,6 +110,13 @@ export default function SettingsScreen() {
       try { localStorage.removeItem('inksight_passcode'); localStorage.removeItem('inksight_locked'); } catch {}
     }
   };
+
+  // Auto-submit passcode when 4 digits are entered
+  useEffect(() => {
+    if (passcodeInput.length === 4) {
+      handlePasscodeSet();
+    }
+  }, [passcodeInput]);
 
   const handlePasscodeSet = () => {
     if (passcodeInput.length !== 4) return;
@@ -321,8 +334,8 @@ export default function SettingsScreen() {
               <MaterialIcons name="notifications-active" size={18} color={textMuted} />
               <Text style={[styles.panelLabel, { color: textMain, flex: 1 }]}>Daily Journal Reminder</Text>
               <Switch
-                value={getLS('inksight_reminders', false)}
-                onValueChange={(v) => setLS('inksight_reminders', v)}
+                value={remindersEnabled}
+                onValueChange={(v) => { setRemindersEnabled(v); setLS('inksight_reminders', v); }}
                 trackColor={{ false: isDark ? '#4A5568' : '#CBD5E1', true: primary }}
                 thumbColor="#FFFFFF"
               />
@@ -374,12 +387,13 @@ export default function SettingsScreen() {
                 <Text style={[styles.passcodeTitle, { color: textMain }]}>
                   {passcodeStep === 'set' ? '🔐 Set a 4-digit passcode' : '🔁 Confirm your passcode'}
                 </Text>
-                <View style={styles.passcodeInputRow}>
+                <TouchableOpacity activeOpacity={1} style={styles.passcodeInputRow} onPress={() => passcodeRef.current?.focus()}>
                   {[0, 1, 2, 3].map(i => (
                     <View key={i} style={[styles.passcodeDot, { borderColor: primary, backgroundColor: passcodeInput.length > i ? primary : 'transparent' }]} />
                   ))}
-                </View>
+                </TouchableOpacity>
                 <TextInput
+                  ref={passcodeRef}
                   style={[styles.hiddenInput, { color: textMain }]}
                   keyboardType="number-pad"
                   maxLength={4}
