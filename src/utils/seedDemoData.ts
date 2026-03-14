@@ -1,4 +1,4 @@
-import { SQLiteDatabase } from 'expo-sqlite';
+import { Platform } from 'react-native';
 import { subDays } from 'date-fns';
 
 const LOREM_ENTRIES = [
@@ -23,7 +23,11 @@ const EMOTION_POOL = [
   { emotion: 'joyful', color: '#F5D769', score: 0.9 }
 ];
 
-export const seedDemoData = async (db: SQLiteDatabase) => {
+export const seedDemoData = async (db: any) => {
+  if (Platform.OS === 'web' || !db) {
+    console.log('[Web] Skipping demo data seeding');
+    return;
+  }
   try {
     console.log('Seeding demo data...');
     const today = new Date();

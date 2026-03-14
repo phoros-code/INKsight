@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Lora:ital,wght@0,400;1,400&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#5B8DB8",
+                        "background-light": "#F5F2EE",
+                        "background-dark": "#221610",
+                        "ink-slate": "#7F8C8D",
+                        "ink-blue-soft": "#EBF2F9",
+                        "ink-teal": "#7DBFA7",
+                        "ink-pensive": "#89ABD4",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"],
+                        "serif": ["Lora", "serif"],
+                        "inter": ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1.25rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .ruled-lines {
+            background-image: linear-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 100% 2rem;
+            line-height: 2rem;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<nav class="flex items-center justify-between px-6 py-4 bg-background-light/80 backdrop-blur-md sticky top-0 z-10">
+<button class="flex items-center gap-1 text-ink-slate hover:opacity-80 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">close</span>
+<span class="text-sm font-medium">Close</span>
+</button>
+<h2 class="font-inter text-lg font-semibold tracking-tight">March 9</h2>
+<button class="bg-primary text-white px-6 py-1.5 rounded-full text-sm font-semibold hover:opacity-90 transition-all shadow-sm">
+            Save
+        </button>
+</nav>
+<main class="flex-1 flex flex-col px-4 max-w-2xl mx-auto w-full gap-4 pb-24">
+<!-- Prompt Card -->
+<div class="bg-ink-blue-soft dark:bg-primary/10 rounded-2xl p-5 flex flex-col gap-3 border border-primary/10">
+<div class="flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined text-[20px] fill-current">auto_awesome</span>
+<span class="text-xs font-bold uppercase tracking-wider">Daily Spark</span>
+</div>
+<p class="font-serif italic text-xl text-slate-800 dark:text-slate-200 leading-snug">
+                What's been occupying your mind today?
+            </p>
+</div>
+<!-- Main Writing Area -->
+<div class="flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col min-h-[55vh] overflow-hidden">
+<div class="p-6 flex-1 flex flex-col">
+<textarea class="w-full flex-1 border-none focus:ring-0 p-0 text-lg font-serif italic text-slate-700 dark:text-slate-300 placeholder:text-slate-400 bg-transparent ruled-lines resize-none" placeholder="Begin writing freely..."></textarea>
+</div>
+<!-- Word Mirror Strip -->
+<div class="px-6 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3 overflow-x-auto no-scrollbar">
+<div class="flex items-center gap-1 shrink-0 text-primary">
+<span class="material-symbols-outlined text-sm">magic_button</span>
+<span class="text-[10px] font-bold uppercase tracking-tighter">Word suggestions</span>
+</div>
+<div class="flex gap-2">
+<button class="px-3 py-1 bg-background-light dark:bg-slate-800 rounded-full text-xs font-medium text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors">melancholic</button>
+<button class="px-3 py-1 bg-background-light dark:bg-slate-800 rounded-full text-xs font-medium text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors">at peace</button>
+<button class="px-3 py-1 bg-background-light dark:bg-slate-800 rounded-full text-xs font-medium text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-primary transition-colors">restless</button>
+</div>
+</div>
+</div>
+<!-- Floating Tag Strip -->
+<div class="flex flex-col gap-2 px-2">
+<h4 class="text-ink-slate text-[11px] font-bold uppercase tracking-widest px-1">Add context:</h4>
+<div class="flex flex-wrap gap-2">
+<button class="flex items-center gap-1.5 px-4 py-1.5 bg-white dark:bg-slate-800 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary/5">
+<span class="material-symbols-outlined text-sm">wb_sunny</span>
+                    Morning
+                </button>
+<button class="flex items-center gap-1.5 px-4 py-1.5 bg-white dark:bg-slate-800 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary/5">
+<span class="material-symbols-outlined text-sm">work_outline</span>
+                    Work
+                </button>
+<button class="flex items-center gap-1.5 px-4 py-1.5 bg-white dark:bg-slate-800 rounded-full text-sm font-medium border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-primary/5">
+<span class="material-symbols-outlined text-sm">home</span>
+                    Home
+                </button>
+<button class="flex items-center justify-center size-8 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-400">
+<span class="material-symbols-outlined text-lg">add</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Emotion Detection Bar (Sticky Bottom) -->
+<div class="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 py-4 flex items-center justify-between z-20">
+<div class="flex items-center gap-3">
+<span class="text-xs font-bold text-ink-slate uppercase tracking-widest">Sensing:</span>
+<div class="flex gap-2">
+<div class="flex items-center gap-1.5 px-3 py-1 bg-ink-teal/15 text-ink-teal rounded-full text-xs font-semibold animate-pulse-slow">
+<div class="size-1.5 rounded-full bg-ink-teal"></div>
+                    calm
+                </div>
+<div class="flex items-center gap-1.5 px-3 py-1 bg-ink-pensive/15 text-ink-pensive rounded-full text-xs font-semibold">
+<div class="size-1.5 rounded-full bg-ink-pensive"></div>
+                    pensive
+                </div>
+</div>
+</div>
+<div class="text-primary opacity-50">
+<span class="material-symbols-outlined">bubble_chart</span>
+</div>
+</div>
+</body></html>

@@ -1,10 +1,13 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import { JournalEntry } from '../types';
 
+const SQLite = Platform.OS !== 'web' ? require('expo-sqlite') : null;
+
 export const insertEntry = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   entry: Partial<JournalEntry>
 ): Promise<number> => {
+  if (Platform.OS === 'web' || !db) return 0;
   try {
     const now = new Date().toISOString();
     
@@ -42,10 +45,11 @@ export const insertEntry = async (
 };
 
 export const updateEntry = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   id: number,
   updates: Partial<JournalEntry>
 ): Promise<void> => {
+  if (Platform.OS === 'web' || !db) return;
   try {
     const now = new Date().toISOString();
     
@@ -82,11 +86,12 @@ export const updateEntry = async (
 };
 
 export const getEntryByDate = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   date: string
 ): Promise<JournalEntry | null> => {
+  if (Platform.OS === 'web' || !db) return null;
   try {
-    const result = await db.getFirstAsync<any>(
+    const result = await db.getFirstAsync(
       'SELECT * FROM journal_entries WHERE date = ? ORDER BY created_at DESC LIMIT 1',
       [date]
     );
@@ -100,12 +105,13 @@ export const getEntryByDate = async (
 };
 
 export const getEntriesByRange = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   startDate: string,
   endDate: string
 ): Promise<JournalEntry[]> => {
+  if (Platform.OS === 'web' || !db) return [];
   try {
-    const results = await db.getAllAsync<any>(
+    const results = await db.getAllAsync(
       'SELECT * FROM journal_entries WHERE date >= ? AND date <= ? ORDER BY date DESC',
       [startDate, endDate]
     );
@@ -118,10 +124,11 @@ export const getEntriesByRange = async (
 };
 
 export const getAllEntries = async (
-  db: SQLite.SQLiteDatabase
+  db: any
 ): Promise<JournalEntry[]> => {
+  if (Platform.OS === 'web' || !db) return [];
   try {
-    const results = await db.getAllAsync<any>(
+    const results = await db.getAllAsync(
       'SELECT * FROM journal_entries ORDER BY date DESC'
     );
     return results.map(parseEntryRow);
@@ -132,9 +139,10 @@ export const getAllEntries = async (
 };
 
 export const deleteEntry = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   id: number
 ): Promise<void> => {
+  if (Platform.OS === 'web' || !db) return;
   try {
     await db.runAsync('DELETE FROM journal_entries WHERE id = ?', [id]);
   } catch (error) {
@@ -143,9 +151,10 @@ export const deleteEntry = async (
   }
 };
 
-export const getEntryCount = async (db: SQLite.SQLiteDatabase): Promise<number> => {
+export const getEntryCount = async (db: any): Promise<number> => {
+  if (Platform.OS === 'web' || !db) return 0;
   try {
-    const result = await db.getFirstAsync<{ count: number }>(
+    const result = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM journal_entries'
     );
     return result?.count || 0;
@@ -155,11 +164,12 @@ export const getEntryCount = async (db: SQLite.SQLiteDatabase): Promise<number> 
   }
 };
 
-export const getStreakCount = async (db: SQLite.SQLiteDatabase): Promise<number> => {
+export const getStreakCount = async (db: any): Promise<number> => {
+  if (Platform.OS === 'web' || !db) return 0;
   try {
     // A simplified streak calculation logic: fetch all distinct dates in descending order
     // and count consecutive days backwards from today or yesterday
-    const results = await db.getAllAsync<{ date: string }>(
+    const results = await db.getAllAsync(
       'SELECT DISTINCT date FROM journal_entries ORDER BY date DESC'
     );
     
@@ -171,7 +181,7 @@ export const getStreakCount = async (db: SQLite.SQLiteDatabase): Promise<number>
     const yesterday = yesterdayDate.toISOString().split('T')[0];
 
     // Array of dates ["2026-03-09", "2026-03-08", etc]
-    const dates = results.map((row) => row.date);
+    const dates = results.map((row: any) => row.date);
     
     let streak = 0;
     let currentDate = new Date();

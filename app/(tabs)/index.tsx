@@ -53,7 +53,7 @@ export default function HomeDashboard() {
       setTodayCheckin(checkin);
 
       // Fetch Latest Insight (assuming recent one)
-      const insightRow = await db.getFirstAsync<any>(
+      const insightRow = await db.getFirstAsync(
         'SELECT * FROM pattern_insights ORDER BY id DESC LIMIT 1'
       );
       if (insightRow) {

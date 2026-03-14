@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&amp;family=Nunito:wght@700&amp;family=Lora:ital,wght@0,400;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#5B8DB8",
+                        "background-light": "#F5F2EE",
+                        "background-dark": "#221610",
+                        "ink-neutral": "#7F8C8D",
+                        "ink-dark": "#2C3E50",
+                        "border-muted": "#E0DAD3",
+                        "chip-bg": "#F0EDE8"
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"],
+                        "nunito": ["Nunito", "sans-serif"],
+                        "lora": ["Lora", "serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .watercolor-bg {
+            background: radial-gradient(circle at center, rgba(91, 141, 184, 0.08) 0%, rgba(245, 242, 238, 0) 70%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display min-h-screen flex flex-col">
+<div class="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto">
+<!-- Top Navigation -->
+<div class="flex items-center p-6 justify-between">
+<button class="text-ink-neutral hover:text-ink-dark transition-colors">
+<span class="material-symbols-outlined text-3xl">arrow_back</span>
+</button>
+<div class="text-ink-neutral font-medium text-sm">Step 3 of 3</div>
+</div>
+<!-- Main Content -->
+<div class="flex-1 px-6 pb-20 relative">
+<!-- Background Decorative Element -->
+<div class="absolute inset-0 watercolor-bg pointer-events-none -z-10" data-alt="Soft blue watercolor ink drop background"></div>
+<div class="pt-4">
+<h1 class="font-nunito text-2xl font-bold text-ink-dark leading-tight">Right now, in this moment...</h1>
+<p class="font-lora italic text-[15px] text-ink-neutral mt-2">How would you describe how you feel?</p>
+</div>
+<!-- Emotion Chip Grid -->
+<div class="grid grid-cols-3 gap-3 mt-8">
+<!-- Calm -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#7DBFA7] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#7DBFA7]">Calm</span>
+</button>
+<!-- Anxious -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#89B4D4] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#89B4D4]">Anxious</span>
+</button>
+<!-- Hopeful -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#F0C070] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#F0C070]">Hopeful</span>
+</button>
+<!-- Empty -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#A8B8C8] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#A8B8C8]">Empty</span>
+</button>
+<!-- Overwhelmed -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#C4A4C0] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#C4A4C0]">Overwhelmed</span>
+</button>
+<!-- Grateful -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#90C49A] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#90C49A]">Grateful</span>
+</button>
+<!-- Tired -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#B8A898] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#B8A898]">Tired</span>
+</button>
+<!-- Curious -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#7DBFA7] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#7DBFA7]">Curious</span>
+</button>
+<!-- Sad -->
+<button class="h-10 flex items-center justify-center rounded-full bg-chip-bg border border-transparent hover:border-[#89ABD4] transition-all group">
+<span class="text-sm font-medium text-ink-dark group-hover:text-[#89ABD4]">Sad</span>
+</button>
+</div>
+<!-- Text Input Field -->
+<div class="mt-8">
+<textarea class="w-full h-32 p-4 rounded-xl border-border-muted bg-white text-ink-dark font-lora text-[15px] focus:ring-primary focus:border-primary resize-none placeholder-ink-neutral/50" placeholder="Add more details about your mood..."></textarea>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="p-6 space-y-6">
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-nunito font-bold py-4 rounded-full transition-all shadow-lg shadow-primary/20">
+                Start Reflecting
+            </button>
+<!-- Progress Dots -->
+<div class="flex justify-center gap-2">
+<div class="size-2 rounded-full bg-ink-neutral/30"></div>
+<div class="size-2 rounded-full bg-ink-neutral/30"></div>
+<div class="size-2 rounded-full bg-primary"></div>
+</div>
+</div>
+</div>
+</body></html>

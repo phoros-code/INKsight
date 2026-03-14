@@ -78,22 +78,36 @@ export default function RootLayout() {
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
-    if (isReady && fontsLoaded) {
+    if (!isReady || !fontsLoaded) return;
+
+    async function handleRouting() {
+      // Re-read onboarding state fresh from AsyncStorage every time
+      // (emotion-check.tsx may have set it since our initial read)
+      const freshValue = await AsyncStorage.getItem('onboarding_complete');
+      const onboardingDone = freshValue === 'true';
+
+      // Keep React state in sync
+      if (onboardingDone !== isOnboardingComplete) {
+        setIsOnboardingComplete(onboardingDone);
+      }
+
       if (SplashScreen) SplashScreen.hideAsync();
 
       const inOnboarding = segments[0] === 'onboarding';
 
-      if (!isOnboardingComplete && !inOnboarding) {
+      if (!onboardingDone && !inOnboarding) {
         router.replace('/onboarding/welcome');
-      } else if (isOnboardingComplete && !isUnlocked && biometricsEnabled) {
+      } else if (onboardingDone && !isUnlocked && biometricsEnabled) {
         // Wait for biometric unlock
-      } else if (isOnboardingComplete && inOnboarding) {
+      } else if (onboardingDone && inOnboarding) {
         router.replace('/(tabs)');
-      } else if (isOnboardingComplete && (isUnlocked || !biometricsEnabled) && !inOnboarding) {
+      } else if (onboardingDone && (isUnlocked || !biometricsEnabled) && !inOnboarding) {
         checkWeeklySummary();
       }
     }
-  }, [isReady, fontsLoaded, isOnboardingComplete, isUnlocked, segments]);
+
+    handleRouting();
+  }, [isReady, fontsLoaded, isUnlocked, segments]);
 
   const checkWeeklySummary = async () => {
     const today = new Date();

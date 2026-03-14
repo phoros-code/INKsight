@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>INKsight - Safe Space</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Nunito:wght@700&amp;family=Lora:ital,wght@0,400;1,400&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "safe-teal": "#7DBFA7",
+                        "safe-blue": "#5B8DB8",
+                        "safe-warm": "#E8A87C",
+                        "safe-text-dark": "#2C3E50",
+                        "safe-text-muted": "#5B7A96",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#221610",
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"],
+                        "heading": ["Nunito", "sans-serif"],
+                        "serif": ["Lora", "serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #F0F6FB 0%, #EDF8F4 100%);
+        }
+        .breathing-circle {
+            background: linear-gradient(135deg, #7DBFA7 0%, #5B8DB8 100%);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="relative flex min-h-screen w-full flex-col gradient-bg overflow-x-hidden">
+<div class="flex items-center p-4 justify-between">
+<button class="text-safe-text-muted dark:text-slate-400 flex size-12 shrink-0 items-center justify-start">
+<span class="material-symbols-outlined text-2xl">close</span>
+</button>
+<h2 class="text-safe-text-dark dark:text-slate-200 text-lg font-bold leading-tight tracking-tight flex-1 text-center pr-12">Safe Space</h2>
+</div>
+<div class="flex flex-col items-center px-6 pt-8 pb-4">
+<div class="text-5xl mb-6">💙</div>
+<h1 class="font-heading text-[26px] text-safe-text-dark dark:text-slate-100 text-center mb-2">This moment will pass.</h1>
+<p class="font-serif text-[16px] text-safe-text-muted dark:text-slate-300 text-center max-w-xs italic">
+                You don't have to feel this alone. We're here, and so are others.
+            </p>
+</div>
+<div class="px-4 py-6 @container">
+<div class="bg-white/60 dark:bg-slate-800/40 backdrop-blur-md rounded-2xl p-6 shadow-sm border border-white/40 dark:border-slate-700/30">
+<div class="flex flex-col items-center gap-6">
+<div class="relative flex items-center justify-center w-32 h-32">
+<div class="breathing-circle w-28 h-28 rounded-full opacity-80 blur-[2px]"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="text-white font-medium">Breathe</span>
+</div>
+</div>
+<div class="text-center">
+<p class="text-safe-text-dark dark:text-slate-100 text-xl font-bold mb-1">Breathing Exercise</p>
+<p class="text-safe-teal dark:text-safe-teal font-serif italic text-lg mb-4">Breathe in...</p>
+<button class="bg-safe-teal hover:bg-safe-teal/90 text-white font-bold py-3 px-10 rounded-xl transition-all shadow-md active:scale-95">
+                            Start Breathing
+                        </button>
+</div>
+</div>
+</div>
+</div>
+<div class="px-4 space-y-3 mb-8">
+<h3 class="text-safe-text-dark dark:text-slate-200 text-sm font-bold uppercase tracking-wider px-1 pb-1">Immediate Support</h3>
+<div class="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+<div class="flex items-center gap-4">
+<div class="bg-safe-teal/10 p-3 rounded-full text-safe-teal">
+<span class="material-symbols-outlined">call</span>
+</div>
+<div>
+<p class="font-bold text-safe-text-dark dark:text-slate-100">iCall India Helpline</p>
+<p class="text-xs text-safe-text-muted dark:text-slate-400">Professional counseling support</p>
+</div>
+</div>
+<button class="bg-safe-teal text-white px-5 py-2 rounded-lg text-sm font-bold">Call</button>
+</div>
+<div class="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+<div class="flex items-center gap-4">
+<div class="bg-safe-blue/10 p-3 rounded-full text-safe-blue">
+<span class="material-symbols-outlined">anchor</span>
+</div>
+<div>
+<p class="font-bold text-safe-text-dark dark:text-slate-100">Grounding Technique</p>
+<p class="text-xs text-safe-text-muted dark:text-slate-400">Connect with the present moment</p>
+</div>
+</div>
+<button class="bg-safe-blue text-white px-5 py-2 rounded-lg text-sm font-bold">Start</button>
+</div>
+<div class="flex items-center justify-between bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+<div class="flex items-center gap-4">
+<div class="bg-safe-warm/10 p-3 rounded-full text-safe-warm">
+<span class="material-symbols-outlined">edit_note</span>
+</div>
+<div>
+<p class="font-bold text-safe-text-dark dark:text-slate-100">Emergency Journal</p>
+<p class="text-xs text-safe-text-muted dark:text-slate-400">Release your thoughts safely</p>
+</div>
+</div>
+<button class="bg-safe-warm text-white px-5 py-2 rounded-lg text-sm font-bold">Write</button>
+</div>
+</div>
+<div class="mt-auto px-6 pb-8 text-center">
+<button class="text-primary font-bold text-base mb-6 underline underline-offset-4 decoration-primary/30">
+                I'm feeling better
+            </button>
+<div class="p-4 bg-white/30 dark:bg-slate-900/20 rounded-lg">
+<p class="text-[11px] leading-relaxed text-safe-text-muted dark:text-slate-500 uppercase tracking-tighter">
+                    Note: This is a safe space for support and does not replace professional medical advice. If you are in immediate physical danger, please contact local emergency services immediately.
+                </p>
+</div>
+</div>
+</div>
+</body></html>

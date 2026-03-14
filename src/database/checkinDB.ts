@@ -1,10 +1,13 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import { CheckIn } from '../types';
 
+const SQLite = Platform.OS !== 'web' ? require('expo-sqlite') : null;
+
 export const insertCheckin = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   checkin: Partial<CheckIn>
 ): Promise<void> => {
+  if (Platform.OS === 'web' || !db) return;
   try {
     const now = new Date().toISOString();
     const date = checkin.date || now.split('T')[0];
@@ -30,11 +33,12 @@ export const insertCheckin = async (
 };
 
 export const getCheckinByDate = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   date: string
 ): Promise<CheckIn | null> => {
+  if (Platform.OS === 'web' || !db) return null;
   try {
-    const result = await db.getFirstAsync<CheckIn>(
+    const result = await db.getFirstAsync(
       'SELECT * FROM daily_checkins WHERE date = ? LIMIT 1',
       [date]
     );
@@ -47,12 +51,13 @@ export const getCheckinByDate = async (
 };
 
 export const getCheckinsForRange = async (
-  db: SQLite.SQLiteDatabase,
+  db: any,
   startDate: string,
   endDate: string
 ): Promise<CheckIn[]> => {
+  if (Platform.OS === 'web' || !db) return [];
   try {
-    const results = await db.getAllAsync<CheckIn>(
+    const results = await db.getAllAsync(
       'SELECT * FROM daily_checkins WHERE date >= ? AND date <= ? ORDER BY date ASC',
       [startDate, endDate]
     );

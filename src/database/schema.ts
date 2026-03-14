@@ -1,6 +1,11 @@
-import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
+const SQLite = Platform.OS !== 'web' ? require('expo-sqlite') : null;
 
-export const initDatabase = async (db: SQLite.SQLiteDatabase) => {
+export const initDatabase = async (db: any) => {
+  if (Platform.OS === 'web' || !db) {
+    console.log('[Web] Skipping native database initialization');
+    return;
+  }
   try {
     // Journal Entries Table
     await db.execAsync(`
@@ -72,7 +77,7 @@ export const initDatabase = async (db: SQLite.SQLiteDatabase) => {
     `);
 
     // Seed Emotion Vocabulary if empty
-    const result = await db.getAllAsync<{ count: number }>(
+    const result = await db.getAllAsync(
       'SELECT COUNT(*) as count FROM emotion_vocabulary'
     );
     
@@ -87,7 +92,7 @@ export const initDatabase = async (db: SQLite.SQLiteDatabase) => {
   }
 };
 
-const seedEmotionVocabulary = async (db: SQLite.SQLiteDatabase) => {
+const seedEmotionVocabulary = async (db: any) => {
   const seeds = [
     // Sad
     { basic: 'sad', richer: 'melancholic', def: 'A feeling of pensive sadness, typically with no obvious cause', int: 2, cat: 'Sadness' },

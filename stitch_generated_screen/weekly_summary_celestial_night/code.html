@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&amp;family=Lora:ital,wght@1,400;1,500;1,600&amp;family=Nunito:wght@700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#ec5b13",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#1E2A3A", // Overridden by custom gradient below as requested
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"],
+                        "heading": ["Nunito", "sans-serif"],
+                        "serif": ["Lora", "serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .gradient-bg {
+            background: linear-gradient(180deg, #1E2A3A 0%, #2C3E50 100%);
+        }
+        .emotion-orb {
+            background: radial-gradient(circle at 30% 30%, #6366f1, #a855f7);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display text-slate-900 dark:text-slate-100 antialiased">
+<div class="relative flex min-h-screen w-full flex-col gradient-bg overflow-x-hidden">
+<!-- Header -->
+<header class="flex flex-col items-center pt-8 pb-6 px-4">
+<div class="mb-2 text-3xl">🌟</div>
+<h1 class="font-heading text-[26px] font-bold text-white leading-tight">Your Week in Words</h1>
+<p class="font-serif italic text-sm text-[#8AA8C4] mt-1">March 3 – 9, 2025</p>
+</header>
+<!-- Main Stats Row -->
+<div class="grid grid-cols-3 gap-3 px-4 mb-6">
+<div class="bg-[#253447] rounded-xl p-4 flex flex-col items-center justify-center border border-white/5 shadow-lg">
+<span class="material-symbols-outlined text-[#8AA8C4] mb-1">edit_note</span>
+<p class="text-[10px] uppercase tracking-wider text-[#8AA8C4] font-semibold">Entries</p>
+<p class="text-2xl font-bold text-white mt-1">12</p>
+</div>
+<div class="bg-[#253447] rounded-xl p-4 flex flex-col items-center justify-center border border-white/5 shadow-lg">
+<span class="material-symbols-outlined text-[#8AA8C4] mb-1">menu_book</span>
+<p class="text-[10px] uppercase tracking-wider text-[#8AA8C4] font-semibold">Words</p>
+<p class="text-2xl font-bold text-white mt-1">4.2k</p>
+</div>
+<div class="bg-[#253447] rounded-xl p-4 flex flex-col items-center justify-center border border-white/5 shadow-lg">
+<span class="material-symbols-outlined text-[#8AA8C4] mb-1">schedule</span>
+<p class="text-[10px] uppercase tracking-wider text-[#8AA8C4] font-semibold">Avg Time</p>
+<p class="text-2xl font-bold text-white mt-1">15m</p>
+</div>
+</div>
+<div class="px-4 space-y-4 max-w-xl mx-auto w-full">
+<!-- Dominant Emotion Card -->
+<div class="bg-[#253447] rounded-xl p-5 border border-white/5 shadow-xl">
+<h3 class="text-xs font-bold text-[#8AA8C4] uppercase tracking-widest mb-4">Dominant Emotion</h3>
+<div class="flex items-center gap-6">
+<div class="relative">
+<div class="emotion-orb w-20 h-20 rounded-full blur-[1px] shadow-[0_0_20px_rgba(168,85,247,0.4)]"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="text-white font-bold text-xs">84%</span>
+</div>
+</div>
+<div class="flex-1">
+<p class="text-xl font-bold text-white mb-2">Reflective</p>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-white/5 rounded-full text-[10px] text-[#8AA8C4] border border-white/10">Calm</span>
+<span class="px-2 py-1 bg-white/5 rounded-full text-[10px] text-[#8AA8C4] border border-white/10">Curious</span>
+<span class="px-2 py-1 bg-white/5 rounded-full text-[10px] text-[#8AA8C4] border border-white/10">Grateful</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Best Sentence Card -->
+<div class="bg-[#253447] rounded-xl p-5 border border-white/5 shadow-xl relative overflow-hidden">
+<div class="absolute top-0 right-0 p-3 opacity-10">
+<span class="material-symbols-outlined text-4xl">format_quote</span>
+</div>
+<h3 class="text-xs font-bold text-[#8AA8C4] uppercase tracking-widest mb-3">Week's Best Sentence</h3>
+<p class="font-serif italic text-[17px] leading-relaxed text-slate-100">
+                    "The stars don't just exist to be seen; they exist to remind us that even the smallest light matters in a vast dark sky."
+                </p>
+</div>
+<!-- AI Weekly Insight Card -->
+<div class="bg-[#253447] rounded-xl overflow-hidden border border-white/5 shadow-xl flex">
+<div class="w-1.5 bg-[#E8A87C]"></div>
+<div class="p-5">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-[#E8A87C] text-sm">auto_awesome</span>
+<h3 class="text-xs font-bold text-[#E8A87C] uppercase tracking-widest">AI Weekly Insight</h3>
+</div>
+<p class="text-sm text-slate-200 leading-relaxed">
+                        You've been focusing heavily on internal growth this week. Your entries suggest a transition from seeking external validation to finding peace in your personal progress. Keep exploring the theme of 'quiet resilience' that appeared on Wednesday.
+                    </p>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<footer class="mt-10 mb-8 px-4 flex flex-col items-center gap-6">
+<button class="w-full max-w-xs py-3 px-6 rounded-xl border border-[#8AA8C4] text-[#8AA8C4] font-bold text-sm hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg">share</span>
+                Share Summary
+            </button>
+<div class="flex flex-col items-center gap-2">
+<p class="text-[11px] text-[#8AA8C4]/60 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">lock</span>
+                    Your reflections are private and encrypted.
+                </p>
+<a class="text-sm font-semibold text-primary/80 hover:text-primary transition-colors" href="#">Back to Home</a>
+</div>
+</footer>
+<!-- Decorative elements -->
+<div class="fixed bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#2C3E50]/50 to-transparent pointer-events-none z-0"></div>
+</div>
+</body></html>

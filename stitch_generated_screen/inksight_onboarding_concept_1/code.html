@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&amp;family=Lora:ital,wght@0,400;1,400&amp;family=Nunito:wght@600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#5B8DB8",
+                "primary-sage": "#7DBFA7",
+                "background-light": "#F5F2EE",
+                "background-dark": "#221610",
+                "ink-blue": "#2C3E50",
+                "ink-gray": "#7F8C8D",
+                "dot-inactive": "#D4DEE8",
+              },
+              fontFamily: {
+                "display": ["Public Sans", "sans-serif"],
+                "nunito": ["Nunito", "sans-serif"],
+                "lora": ["Lora", "serif"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display min-h-screen flex flex-col items-center justify-between">
+<div class="relative flex h-screen max-w-md w-full flex-col bg-background-light dark:bg-background-dark overflow-hidden">
+<div class="h-[40%] w-full relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary-sage/10 to-transparent"></div>
+<div class="w-full h-full bg-center bg-no-repeat bg-cover" data-alt="Soft blue and sage green watercolor ink strokes abstract pattern" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCW0wOUfMud3IbcGHOcvK9Q1xo6DbEm_9SWChD2TMsGMvDXxVX3t8HEhw6tllTYZqYxAV6LNi9geE2y13lspZNmQey52i3rWYYS1HzHrzW-33tIcFqv_kYgoOUgh5D11R4Wg9XVN_DnfKkC05IIaPSSFKSgDzgYHOcuaebQ0Yc-bZDtxaQSR_Vc4Bp3IV0w_1ZZLY6fZH46JEQbOUeYe-XuxXCDgOcN6Te-X746iwiOsxEe3-YGzXpZvMv-4CPJOLij3zNCootcvNw");'>
+</div>
+<div class="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-background-light dark:from-background-dark to-transparent"></div>
+</div>
+<div class="flex flex-col items-center px-8 pt-6 flex-grow">
+<h1 class="font-nunito text-[28px] font-bold leading-tight text-ink-blue dark:text-slate-100 text-center mb-6">
+                Your mind has patterns. Let's discover them together.
+            </h1>
+<p class="font-lora text-[15px] font-normal leading-[1.7] text-ink-gray dark:text-slate-400 text-center max-w-[320px]">
+                INKsight is your private reflection companion. No judgments. No diagnoses. Just you and your words.
+            </p>
+</div>
+<div class="w-full px-8 pb-10 flex flex-col items-center gap-8">
+<button class="w-full h-[56px] rounded-full bg-primary hover:bg-primary/90 text-white font-nunito font-semibold text-[16px] tracking-wide transition-all shadow-lg shadow-primary/20">
+                Begin Your Journey
+            </button>
+<div class="flex items-center gap-3">
+<div class="w-2.5 h-2.5 rounded-full bg-primary"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-dot-inactive dark:bg-slate-700"></div>
+<div class="w-2.5 h-2.5 rounded-full bg-dot-inactive dark:bg-slate-700"></div>
+</div>
+</div>
+</div>
+</body></html>

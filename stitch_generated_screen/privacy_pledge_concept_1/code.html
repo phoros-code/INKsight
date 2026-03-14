@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&amp;family=Nunito:wght@600;700&amp;family=Lora&amp;family=Inter:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#5B8DB8",
+                        "background-light": "#F5F2EE",
+                        "background-dark": "#221610",
+                        "sage": "#7DBFA7",
+                        "navy": "#2C3E50",
+                        "muted": "#7F8C8D",
+                        "accent-blue": "#EBF2F9"
+                    },
+                    fontFamily: {
+                        "display": ["Public Sans", "sans-serif"],
+                        "nunito": ["Nunito", "sans-serif"],
+                        "lora": ["Lora", "serif"],
+                        "inter": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display antialiased">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto">
+<!-- Header / Top Bar -->
+<div class="flex items-center px-4 py-6 justify-between">
+<button class="text-navy dark:text-slate-100 flex size-10 items-center justify-center rounded-full hover:bg-black/5">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex gap-1.5">
+<div class="size-2 rounded-full bg-[#D4DEE8]"></div>
+<div class="size-2 rounded-full bg-primary"></div>
+<div class="size-2 rounded-full bg-[#D4DEE8]"></div>
+</div>
+<div class="size-10"></div> <!-- Spacer for balance -->
+</div>
+<!-- Hero Icon Section -->
+<div class="flex flex-col items-center justify-center pt-8 pb-10">
+<div class="relative flex items-center justify-center">
+<!-- Soft Glow Circle -->
+<div class="absolute size-20 rounded-full bg-sage/15 blur-sm"></div>
+<!-- Lock Icon -->
+<span class="material-symbols-outlined text-sage !text-[64px] relative z-10">lock</span>
+</div>
+</div>
+<!-- Content Section -->
+<div class="flex flex-col items-center px-8 text-center">
+<h1 class="font-nunito text-[26px] font-bold text-navy dark:text-slate-100 leading-tight mb-3">
+                Your words never leave your device.
+            </h1>
+<p class="font-lora text-[15px] text-muted dark:text-slate-400 leading-[1.7] max-w-[300px]">
+                INKsight works entirely offline. No account required. No cloud sync. Protected by biometric lock.
+            </p>
+</div>
+<!-- Feature Rows Section -->
+<div class="mt-10 px-6 space-y-4 flex-grow">
+<!-- Row 1 -->
+<div class="flex items-center gap-4 p-2">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-blue dark:bg-primary/20">
+<span class="material-symbols-outlined text-primary !text-[18px]">shield</span>
+</div>
+<div class="flex flex-col">
+<p class="font-nunito text-sm font-semibold text-navy dark:text-slate-200">End-to-end encrypted locally</p>
+<p class="font-inter text-[13px] text-muted dark:text-slate-400">Your private data is never readable by others</p>
+</div>
+</div>
+<!-- Row 2 -->
+<div class="flex items-center gap-4 p-2">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-blue dark:bg-primary/20">
+<span class="material-symbols-outlined text-primary !text-[18px]">wifi_off</span>
+</div>
+<div class="flex flex-col">
+<p class="font-nunito text-sm font-semibold text-navy dark:text-slate-200">100% offline, always</p>
+<p class="font-inter text-[13px] text-muted dark:text-slate-400">Works without internet or data collection</p>
+</div>
+</div>
+<!-- Row 3 -->
+<div class="flex items-center gap-4 p-2">
+<div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-blue dark:bg-primary/20">
+<span class="material-symbols-outlined text-primary !text-[18px]">fingerprint</span>
+</div>
+<div class="flex flex-col">
+<p class="font-nunito text-sm font-semibold text-navy dark:text-slate-200">Biometric lock protection</p>
+<p class="font-inter text-[13px] text-muted dark:text-slate-400">Keep your diary safe with FaceID or TouchID</p>
+</div>
+</div>
+</div>
+<!-- Bottom Actions -->
+<div class="p-6 pb-10 flex flex-col items-center gap-4">
+<button class="w-full h-14 bg-primary text-white rounded-[30px] font-nunito font-bold text-base shadow-lg shadow-primary/20 active:scale-95 transition-transform">
+                I Feel Safe Here
+            </button>
+<a class="text-primary font-inter text-[13px] underline decoration-primary/30 underline-offset-4" href="#">
+                How does this work?
+            </a>
+</div>
+</div>
+</body></html>

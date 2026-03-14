@@ -1,9 +1,25 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions } from 'react-native';
-import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, Platform, Modal, ScrollView } from 'react-native';
 import { useDatabase, SafeHaptics as Haptics } from '../../utils/webSafe';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Colors } from '../../constants/colors';
+
+// Only import BottomSheet on native
+let BottomSheet: any = null;
+let BottomSheetView: any = null;
+let Animated: any = null;
+let useSharedValue: any = null;
+let useAnimatedStyle: any = null;
+let withSpring: any = null;
+
+if (Platform.OS !== 'web') {
+  BottomSheet = require('@gorhom/bottom-sheet').default;
+  BottomSheetView = require('@gorhom/bottom-sheet').BottomSheetView;
+  const Reanimated = require('react-native-reanimated');
+  Animated = Reanimated.default;
+  useSharedValue = Reanimated.useSharedValue;
+  useAnimatedStyle = Reanimated.useAnimatedStyle;
+  withSpring = Reanimated.withSpring;
+}
 
 const { width } = Dimensions.get('window');
 
@@ -21,8 +37,6 @@ interface VocabularyItem {
   description: string;
 }
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
 export const WordMirrorSheet: React.FC<WordMirrorSheetProps> = ({ 
   isVisible, 
   detectedWord, 
@@ -30,13 +44,14 @@ export const WordMirrorSheet: React.FC<WordMirrorSheetProps> = ({
   onWordSelected 
 }) => {
   const db = useDatabase();
-  const bottomSheetRef = useRef<BottomSheet>(null);
+  const bottomSheetRef = useRef<any>(null);
   const [suggestions, setSuggestions] = useState<VocabularyItem[]>([]);
   const [selectedWordId, setSelectedWordId] = useState<number | null>(null);
   const [selectedIntensity, setSelectedIntensity] = useState<number>(3);
 
-  // Sync sheet visibility with prop
+  // Sync sheet visibility with prop (native only)
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     if (isVisible) {
       bottomSheetRef.current?.expand();
       fetchSuggestions();
@@ -45,11 +60,17 @@ export const WordMirrorSheet: React.FC<WordMirrorSheetProps> = ({
     }
   }, [isVisible, detectedWord]);
 
+  // Web: fetch suggestions when visible
+  useEffect(() => {
+    if (Platform.OS === 'web' && isVisible) {
+      fetchSuggestions();
+    }
+  }, [isVisible, detectedWord]);
+
   const fetchSuggestions = async () => {
     if (!detectedWord) return;
     try {
-      // Very basic LIKE match or exact match on basic_emotion
-      const results = await db.getAllAsync<VocabularyItem>(
+      const results = await db.getAllAsync(
         'SELECT id, richer_word, intensity, description FROM emotion_vocabulary WHERE basic_emotion = ? LIMIT 6',
         [detectedWord.toLowerCase()]
       );
@@ -77,36 +98,121 @@ export const WordMirrorSheet: React.FC<WordMirrorSheetProps> = ({
     if (word) {
       onWordSelected(word);
     }
-    bottomSheetRef.current?.close();
+    if (Platform.OS !== 'web') {
+      bottomSheetRef.current?.close();
+    }
     onClose();
   };
 
   const getIntensityColor = (level: number) => {
-    if (level === 1) return '#90C8B0'; // Green
-    if (level === 2) return '#5B8DB8'; // Blue
-    return '#6A4A9B'; // Purple
+    if (level === 1) return '#90C8B0';
+    if (level === 2) return '#5B8DB8';
+    return '#6A4A9B';
   };
 
-  const renderWordCard = ({ item }: { item: VocabularyItem }) => {
-    const isSelected = selectedWordId === item.id;
-    
-    // Animate scale on select
-    const scale = useSharedValue(isSelected ? 1.03 : 1);
-    const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: withSpring(scale.value) }] }));
+  // Shared inner content for both web and native
+  const sheetContent = (
+    <View style={styles.content}>
+      {/* HEADER */}
+      <Text style={styles.title}>Word Mirror ✨</Text>
+      <View style={styles.highlightPill}>
+        <Text style={styles.highlightText}>
+          You wrote: <Text style={{ color: Colors.primary, fontWeight: 'bold' }}>{detectedWord}</Text>
+        </Text>
+      </View>
 
+      {/* SUGGESTIONS GRID */}
+      {suggestions.length > 0 ? (
+        <>
+          <View style={styles.gridContainer}>
+            {suggestions.map((item) => {
+              const isSelected = selectedWordId === item.id;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.wordCard, isSelected && styles.wordCardSelected]}
+                  activeOpacity={0.8}
+                  onPress={() => handleSelectWord(item.id)}
+                >
+                  <View style={[styles.intensityDot, { backgroundColor: getIntensityColor(item.intensity) }]} />
+                  <Text style={styles.richerWord}>{item.richer_word}</Text>
+                  <Text style={styles.description} numberOfLines={1}>{item.description || 'A deeper feeling.'}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* INTENSITY SCALE */}
+          <View style={styles.intensitySection}>
+             <Text style={styles.intensityLabel}>How intense does this feel?</Text>
+             <View style={styles.dotsRow}>
+               {[1, 2, 3, 4, 5].map((level) => (
+                 <TouchableOpacity
+                   key={level}
+                   onPress={() => handleIntensitySelect(level)}
+                   style={[
+                     styles.intensityScaleDot,
+                     { 
+                       width: 4 + (level * 2), 
+                       height: 4 + (level * 2),
+                       borderRadius: 10,
+                       backgroundColor: selectedIntensity >= level ? '#5B8DB8' : '#D4DEE8'
+                     }
+                   ]}
+                 />
+               ))}
+             </View>
+             <View style={styles.scaleLabels}>
+               <Text style={styles.scaleLabelText}>gentle</Text>
+               <Text style={styles.scaleLabelText}>overwhelming</Text>
+             </View>
+          </View>
+
+          {/* ACTIONS */}
+          <View style={styles.bottomActions}>
+            <TouchableOpacity 
+              style={[styles.applyBtn, !selectedWordId && { opacity: 0.5 }]} 
+              onPress={handleApply}
+              disabled={!selectedWordId}
+            >
+              <Text style={styles.applyBtnText}>Add to Entry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.keepBtn} onPress={onClose}>
+               <Text style={styles.keepBtnText}>Keep original word</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : (
+        <View style={styles.emptyState}>
+           <Text style={styles.emptyText}>Your words are already beautifully precise.</Text>
+           <TouchableOpacity style={styles.keepBtn} onPress={onClose}>
+               <Text style={styles.keepBtnText}>Close</Text>
+            </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  // ─── WEB: Use a simple Modal overlay ───
+  if (Platform.OS === 'web') {
     return (
-      <AnimatedTouchable
-        style={[styles.wordCard, isSelected && styles.wordCardSelected, animatedStyle]}
-        activeOpacity={0.8}
-        onPress={() => handleSelectWord(item.id)}
+      <Modal
+        visible={isVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={onClose}
       >
-        <View style={[styles.intensityDot, { backgroundColor: getIntensityColor(item.intensity) }]} />
-        <Text style={styles.richerWord}>{item.richer_word}</Text>
-        <Text style={styles.description} numberOfLines={1}>{item.description || 'A deeper feeling.'}</Text>
-      </AnimatedTouchable>
+        <TouchableOpacity style={styles.webOverlay} activeOpacity={1} onPress={onClose}>
+          <TouchableOpacity activeOpacity={1} style={styles.webSheet}>
+            <View style={styles.webHandle} />
+            <ScrollView>{sheetContent}</ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     );
-  };
+  }
 
+  // ─── NATIVE: Use @gorhom/bottom-sheet ───
   return (
     <BottomSheet
       ref={bottomSheetRef}
@@ -118,75 +224,7 @@ export const WordMirrorSheet: React.FC<WordMirrorSheetProps> = ({
       handleIndicatorStyle={styles.handleIndicator}
     >
       <BottomSheetView style={styles.content}>
-        
-        {/* HEADER */}
-        <Text style={styles.title}>Word Mirror ✨</Text>
-        <View style={styles.highlightPill}>
-          <Text style={styles.highlightText}>
-            You wrote: <Text style={{ color: Colors.primary, fontWeight: 'bold' }}>{detectedWord}</Text>
-          </Text>
-        </View>
-
-        {/* SUGGESTIONS GRID */}
-        {suggestions.length > 0 ? (
-          <>
-            <FlatList
-              data={suggestions}
-              keyExtractor={(i) => i.id.toString()}
-              numColumns={2}
-              renderItem={renderWordCard}
-              contentContainerStyle={styles.gridContainer}
-              showsVerticalScrollIndicator={false}
-            />
-
-            {/* INTENSITY SCALE */}
-            <View style={styles.intensitySection}>
-               <Text style={styles.intensityLabel}>How intense does this feel?</Text>
-               <View style={styles.dotsRow}>
-                 {[1, 2, 3, 4, 5].map((level) => (
-                   <TouchableOpacity
-                     key={level}
-                     onPress={() => handleIntensitySelect(level)}
-                     style={[
-                       styles.intensityScaleDot,
-                       { 
-                         width: 4 + (level * 2), 
-                         height: 4 + (level * 2),
-                         borderRadius: 10,
-                         backgroundColor: selectedIntensity >= level ? '#5B8DB8' : '#D4DEE8'
-                       }
-                     ]}
-                   />
-                 ))}
-               </View>
-               <View style={styles.scaleLabels}>
-                 <Text style={styles.scaleLabelText}>gentle</Text>
-                 <Text style={styles.scaleLabelText}>overwhelming</Text>
-               </View>
-            </View>
-
-            {/* ACTIONS */}
-            <View style={styles.bottomActions}>
-              <TouchableOpacity 
-                style={[styles.applyBtn, !selectedWordId && { opacity: 0.5 }]} 
-                onPress={handleApply}
-                disabled={!selectedWordId}
-              >
-                <Text style={styles.applyBtnText}>Add to Entry</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.keepBtn} onPress={() => { onClose(); bottomSheetRef.current?.close(); }}>
-                 <Text style={styles.keepBtnText}>Keep original word</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <View style={styles.emptyState}>
-             <Text style={styles.emptyText}>Your words are already beautifully precise.</Text>
-             <TouchableOpacity style={styles.keepBtn} onPress={() => { onClose(); bottomSheetRef.current?.close(); }}>
-                 <Text style={styles.keepBtnText}>Close</Text>
-              </TouchableOpacity>
-          </View>
-        )}
+        {sheetContent}
       </BottomSheetView>
     </BottomSheet>
   );
@@ -228,10 +266,12 @@ const styles = StyleSheet.create({
     color: '#7F8C8D',
   },
   gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingBottom: 20,
   },
   wordCard: {
-    flex: 1,
+    width: '47%',
     backgroundColor: '#F8F6F3',
     borderRadius: 16,
     paddingVertical: 12,
@@ -336,5 +376,27 @@ const styles = StyleSheet.create({
     color: '#A0ADB8',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  // Web-specific styles
+  webOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  webSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '55%',
+    paddingBottom: 20,
+  },
+  webHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#D4CFC9',
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
   },
 });

@@ -66,9 +66,10 @@ export default function SettingsScreen() {
   };
 
   const loadStats = async () => {
+    if (Platform.OS === 'web' || !db) return;
     try {
-      const totalRes = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM journal_entries');
-      const firstRes = await db.getFirstAsync<{date: string}>('SELECT date FROM journal_entries ORDER BY date ASC LIMIT 1');
+      const totalRes = await db.getFirstAsync('SELECT COUNT(*) as count FROM journal_entries');
+      const firstRes = await db.getFirstAsync('SELECT date FROM journal_entries ORDER BY date ASC LIMIT 1');
       const streakValue = await getStreakCount(db);
       
       setJournalStats({
