@@ -1,6 +1,7 @@
 {
   "name": "inksight",
   "version": "1.0.0",
+  "homepage": "https://phoros-code.github.io/INKsight",
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",

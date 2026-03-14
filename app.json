@@ -37,6 +37,9 @@
       "hfApiKey": "PLACEHOLDER_KEY_HERE",
       "APP_VERSION": "1.0.0",
       "TEAM_NAME": "NOMOS"
+    },
+    "experiments": {
+      "baseUrl": "/INKsight"
     }
   }
 }
