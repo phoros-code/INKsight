@@ -10,6 +10,15 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       'expo-sqlite',
       'react-native-mmkv',
       '@react-native-community/slider',
+      'react-native-worklets',
+      'lottie-react-native',
+      '@shopify/react-native-skia',
+      'victory-native',
+      'expo-haptics',
+      'expo-local-authentication',
+      'react-native-view-shot',
+      'expo-file-system',
+      'expo-sharing',
     ];
     if (nativeOnlyModules.some(m => moduleName.startsWith(m))) {
       return {

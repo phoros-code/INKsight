@@ -59,13 +59,13 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Nunito_700Bold',
     fontSize: 22,
-    color: Colors.textPrimary,
+    color: Colors.textDark,
     marginBottom: 12,
   },
   message: {
     fontFamily: 'Lora_400Regular_Italic',
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     textAlign: 'center',
     marginBottom: 32,
     lineHeight: 24,

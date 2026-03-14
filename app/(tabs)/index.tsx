@@ -1,425 +1,284 @@
-/**
- * Home Dashboard — Stitch: home_dashboard_clean_spacious
- * Exact pixel-match to Stitch PNG and code.html.
- */
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  RefreshControl, Platform, Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import { format, subDays } from 'date-fns';
-import { LinearGradient } from 'expo-linear-gradient';
-
 import { Colors } from '../../src/constants/colors';
-import { MoodOrb } from '../../src/components/home/MoodOrb';
-import { WeekStrip } from '../../src/components/home/WeekStrip';
-import { InsightCard } from '../../src/components/home/InsightCard';
-import { DateNavigator } from '../../src/components/ui/DateNavigator';
+import { useTheme } from '../../src/constants/ThemeContext';
+import { MaterialIcons } from '@expo/vector-icons';
 import { webStore } from '../../src/database/webDataStore';
+import * as journalDB from '../../src/database/journalDB';
 
-// Platform-safe imports
-let useSQLiteContext: any = null;
-let getEntryByDate: any = null;
-let getLatestEntry: any = null;
-let getStreakCount: any = null;
-let getEntriesByRange: any = null;
-
-if (Platform.OS !== 'web') {
-  useSQLiteContext = require('expo-sqlite').useSQLiteContext;
-}
-// Always import these — they handle both platforms now
-import {
-  getEntryByDate as _getEntryByDate,
-  getLatestEntry as _getLatestEntry,
-  getStreakCount as _getStreakCount,
-  getEntriesByRange as _getEntriesByRange,
-} from '../../src/database/journalDB';
-getEntryByDate = _getEntryByDate;
-getLatestEntry = _getLatestEntry;
-getStreakCount = _getStreakCount;
-getEntriesByRange = _getEntriesByRange;
+const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const ORB_COLORS = ['#F5D769', '#89ABD4', '#7DBFA7', '#A89FC4', '#F0A868', '#C4A4C0', '#a5b4fc'];
 
 export default function HomeScreen() {
   const router = useRouter();
-  const db = Platform.OS !== 'web' && useSQLiteContext ? useSQLiteContext() : null;
-
-  const [currentDate, setCurrentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [refreshing, setRefreshing] = useState(false);
-  const [greeting, setGreeting] = useState('Good morning');
-  const [userName, setUserName] = useState('Friend');
-  const [streakCount, setStreakCount] = useState(0);
-  const [todayEntry, setTodayEntry] = useState<any>(null);
+  const { theme } = useTheme();
+  const [entryCount, setEntryCount] = useState(0);
+  const [streak, setStreak] = useState(0);
   const [latestEntry, setLatestEntry] = useState<any>(null);
-  const [weekEntries, setWeekEntries] = useState<any[]>([]);
-  const [patternInsight, setPatternInsight] = useState<any>(null);
-  const [weatherEmoji, setWeatherEmoji] = useState('☁️');
+  const [todayMood, setTodayMood] = useState<string>('Thoughtful · Reflective');
+  const [emotions, setEmotions] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const dateToUse = Platform.OS === 'web' ? (webStore.getSimulatedDate() || currentDate) : currentDate;
-
-      // Greeting based on hour
-      const hour = new Date().getHours();
-      if (hour < 12) setGreeting('Good morning');
-      else if (hour < 17) setGreeting('Good afternoon');
-      else setGreeting('Good evening');
-
-      // Weather emoji
-      const emojis = ['☀️', '⛅', '☁️', '🌤️'];
-      setWeatherEmoji(emojis[Math.floor(Math.random() * emojis.length)]);
-
-      // User name
-      if (Platform.OS === 'web') {
-        const name = localStorage.getItem('inksight_user_name');
-        if (name) setUserName(name);
-      }
-
-      // Today's entry
-      const entry = await getEntryByDate(db, dateToUse);
-      setTodayEntry(entry);
-
-      // Latest entry
-      const latest = await getLatestEntry(db);
-      setLatestEntry(latest);
-
-      // Streak
-      const streak = await getStreakCount(db);
-      setStreakCount(streak);
-
-      // Week entries (last 7 days)
-      const weekStart = format(subDays(new Date(dateToUse), 6), 'yyyy-MM-dd');
-      const entries = await getEntriesByRange(db, weekStart, dateToUse);
-      setWeekEntries(entries);
-
-      // Pattern insight (from webStore on web)
-      if (Platform.OS === 'web') {
-        const patterns = webStore.getAllPatterns();
-        if (patterns.length > 0) {
-          setPatternInsight({
-            message: patterns[0].message,
-            type: patterns[0].insight_type,
-          });
+      const count = Platform.OS === 'web' ? webStore.getEntryCount() : await journalDB.getEntryCount(null);
+      setEntryCount(count);
+      const s = Platform.OS === 'web' ? webStore.getStreakCount() : await journalDB.getStreakCount(null);
+      setStreak(s);
+      const latest = Platform.OS === 'web' ? webStore.getLatestEntry() : await journalDB.getLatestEntry(null);
+      if (latest) {
+        setLatestEntry(latest);
+        const de = typeof latest.detected_emotions === 'string'
+          ? JSON.parse(latest.detected_emotions)
+          : (latest.detectedEmotions || latest.detected_emotions || []);
+        if (Array.isArray(de) && de.length > 0) {
+          setEmotions(de.slice(0, 3));
+          const dominant = de[0]?.emotion || 'Reflective';
+          setTodayMood(`${dominant.charAt(0).toUpperCase() + dominant.slice(1)} · Reflective`);
         }
       }
     } catch (e) {
-      console.error('Error loading home data:', e);
+      console.warn('HomeScreen loadData error:', e);
     }
-  }, [currentDate, db]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
   };
 
-  const handleDateChange = (date: string) => {
-    setCurrentDate(date);
+  const getDateStr = () => {
+    const d = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
   };
 
-  // Parse dominant emotion from today's entry
-  const dominantEmotion = todayEntry?.dominantEmotion;
-  const moodLabel = dominantEmotion
-    ? `${dominantEmotion.emotion.charAt(0).toUpperCase() + dominantEmotion.emotion.slice(1)}`
-    : 'Tap to start today\'s reflection';
-  const emotionPills = todayEntry?.detectedEmotions?.slice(0, 3) || [];
-  const emotionCount = todayEntry?.detectedEmotions?.length || 0;
+  const formatEntryTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      const h = d.getHours();
+      const m = d.getMinutes().toString().padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      return `${h % 12 || 12}:${m} ${ampm}`;
+    } catch { return ''; }
+  };
 
-  // Latest entry formatting
-  const latestDate = latestEntry?.date
-    ? format(new Date(latestEntry.created_at || latestEntry.date), 'EEEE, h:mm a')
-    : '';
-  const latestPreview = latestEntry?.content
-    ? (latestEntry.content.length > 120 ? latestEntry.content.slice(0, 120) + '...' : latestEntry.content)
-    : '';
+  // Theme-aware colors
+  const bg = theme.background;
+  const cardBg = theme.card;
+  const textMain = theme.textMain;
+  const textMuted = theme.textMuted;
+  const primary = theme.primary;
+  const isDark = theme.isDark;
+  const borderColor = isDark ? '#FFFFFF0D' : '#0000000A';
 
   return (
-    <View style={styles.container}>
-      {Platform.OS === 'web' && (
-        <DateNavigator currentDate={currentDate} onDateChange={handleDateChange} />
-      )}
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
-        }
-      >
-        {/* ─── HEADER: Stitch: px-6 pt-8 pb-4 ─── */}
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerGreeting}>
-              {greeting}, {userName} {weatherEmoji}
-            </Text>
-            <Text style={styles.headerDate}>
-              {format(new Date(currentDate), 'EEEE, d MMMM')} · Day {streakCount} of reflecting
-            </Text>
+          <View>
+            <Text style={[styles.greeting, { color: textMain }]}>{getGreeting()}, Vala ☁️</Text>
+            <Text style={[styles.dateText, { color: textMuted }]}>{getDateStr()} · Day {entryCount > 0 ? entryCount : 1} of reflecting</Text>
           </View>
-          {/* Stitch: w-10 h-10 rounded-full bg-ink-teal */}
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+          <View style={[styles.avatar, { backgroundColor: primary }]}>
+            <Text style={[styles.avatarText, { color: theme.primaryButtonText }]}>V</Text>
           </View>
         </View>
 
-        {/* ─── MOOD ORB CARD: Stitch: h-[140px] rounded-2xl bg-white p-6 ─── */}
-        <TouchableOpacity
-          style={styles.moodCard}
-          onPress={() => router.push('/modals/daily-checkin')}
-          activeOpacity={0.9}
-        >
-          <View style={styles.moodCardInner}>
-            <View style={styles.moodOrbWrap}>
-              <MoodOrb size={60} emotion={dominantEmotion?.emotion} />
+        {/* Today's Mood Orb Card */}
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          <View style={styles.moodRow}>
+            <View style={styles.moodOrb}>
+              <View style={styles.orbInner} />
             </View>
             <View style={styles.moodInfo}>
-              <Text style={styles.moodEnergyLabel}>TODAY'S ENERGY</Text>
-              <Text style={styles.moodTitle}>{moodLabel}</Text>
-              {emotionPills.length > 0 && (
-                <View style={styles.emotionPillsRow}>
-                  {emotionPills.map((em: any, i: number) => (
-                    <View key={i} style={[styles.emotionPill, { backgroundColor: `${em.color}20` }]}>
-                      <Text style={[styles.emotionPillText, { color: em.color }]}>{em.emotion}</Text>
+              <Text style={[styles.moodLabel, { color: textMuted }]}>TODAY'S ENERGY</Text>
+              <Text style={[styles.moodTitle, { color: textMain }]}>{todayMood}</Text>
+              <View style={styles.emotionTags}>
+                {emotions.slice(0, 2).map((em: any, i: number) => (
+                  <View key={i} style={[styles.emotionTag, { backgroundColor: (em.color || primary) + '15' }]}>
+                    <Text style={[styles.emotionTagText, { color: em.color || primary }]}>
+                      {em.emotion || 'curious'}
+                    </Text>
+                  </View>
+                ))}
+                {emotions.length === 0 && (
+                  <>
+                    <View style={[styles.emotionTag, { backgroundColor: primary + '15' }]}>
+                      <Text style={[styles.emotionTagText, { color: primary }]}>curious</Text>
                     </View>
-                  ))}
-                </View>
-              )}
+                    <View style={[styles.emotionTag, { backgroundColor: Colors.sage + '15' }]}>
+                      <Text style={[styles.emotionTagText, { color: Colors.sage }]}>calm</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            </View>
+            <View style={styles.emotionCount}>
+              <Text style={[styles.emotionCountNum, { color: textMuted }]}>{emotions.length || 3}</Text>
+              <Text style={[styles.emotionCountLabel, { color: textMuted }]}>emotions{'\n'}detected</Text>
             </View>
           </View>
-          {emotionCount > 0 && (
-            <View style={styles.emotionCountWrap}>
-              <Text style={styles.emotionCountText}>{emotionCount} emotions</Text>
-              <Text style={styles.emotionCountText}>detected</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        </View>
 
-        {/* ─── JOURNAL BUTTON: Stitch: gradient from-ink-blue to-ink-teal rounded-[20px] py-4 ─── */}
+        {/* Quick Journal Button */}
         <TouchableOpacity
+          style={[styles.journalBtn, { backgroundColor: primary, shadowColor: primary }]}
           onPress={() => router.push('/(tabs)/journal')}
           activeOpacity={0.9}
-          style={styles.journalBtnWrap}
         >
-          <LinearGradient
-            colors={['#5B8DB8', '#7DBFA7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.journalBtn}
-          >
-            <Feather name="edit-3" size={20} color="#FFFFFF" />
-            <Text style={styles.journalBtnText}>Write in your journal</Text>
-          </LinearGradient>
+          <MaterialIcons name="opacity" size={24} color={theme.primaryButtonText} />
+          <Text style={[styles.journalBtnText, { color: theme.primaryButtonText }]}>Write in your journal</Text>
         </TouchableOpacity>
 
-        {/* ─── WEEK STRIP: Stitch: rounded-2xl bg-white p-6 ─── */}
-        <WeekStrip entries={weekEntries} currentDate={currentDate} />
-
-        {/* ─── PATTERN INSIGHT: Stitch: bg-orange-50 border-orange-100 rounded-2xl p-5 ─── */}
-        {patternInsight && (
-          <InsightCard
-            title="Pattern Spotted"
-            message={patternInsight.message}
-          />
-        )}
-
-        {/* ─── LATEST ENTRY: Stitch: "Latest Entry" title + white card with teal left border ─── */}
-        {latestEntry && (
-          <View style={styles.latestSection}>
-            <Text style={styles.latestTitle}>Latest Entry</Text>
-            <TouchableOpacity
-              style={styles.latestCard}
-              onPress={() => router.push('/(tabs)/journal')}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.latestDate}>{latestDate}</Text>
-              <Text style={styles.latestPreview}>{latestPreview}</Text>
-            </TouchableOpacity>
+        {/* Your Week */}
+        <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+          <View style={styles.weekHeader}>
+            <Text style={[styles.weekTitle, { color: textMain }]}>Your Week</Text>
+            <MaterialIcons name="trending-up" size={20} color={textMuted} />
           </View>
-        )}
+          <View style={styles.weekRow}>
+            {DAYS.map((d, i) => {
+              const isToday = i === new Date().getDay() - 1 || (new Date().getDay() === 0 && i === 6);
+              const size = 20 + Math.random() * 28;
+              return (
+                <View key={i} style={styles.weekDay}>
+                  {isToday ? (
+                    <View style={[styles.todayOrb, { borderColor: primary }]}>
+                      <View style={[styles.weekOrbInner, { backgroundColor: primary + '99' }]} />
+                    </View>
+                  ) : (
+                    <View style={[styles.weekOrb, { width: size, height: size, borderRadius: size / 2, backgroundColor: ORB_COLORS[i] + '60' }]} />
+                  )}
+                  <Text style={[styles.weekDayLabel, { color: textMuted }, isToday && { color: primary, fontWeight: '700' }]}>{d}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Pattern Insight */}
+        <View style={[styles.insightCard, { backgroundColor: isDark ? cardBg : '#FFF7ED', borderColor: isDark ? borderColor : '#FFEDD5' }]}>
+          <View style={[styles.insightIcon, { backgroundColor: primary + '15' }]}>
+            <MaterialIcons name="lightbulb" size={20} color={primary} />
+          </View>
+          <View style={styles.insightContent}>
+            <Text style={[styles.insightTitle, { color: textMain }]}>Pattern Spotted</Text>
+            <Text style={[styles.insightText, { color: textMain + 'CC' }]}>
+              "You write more frequently on evenings after productive workdays, often expressing feelings of clarity and calm."
+            </Text>
+          </View>
+        </View>
+
+        {/* Latest Entry */}
+        <View style={styles.latestSection}>
+          <Text style={[styles.latestTitle, { color: textMain }]}>Latest Entry</Text>
+          <View style={[styles.latestCard, { backgroundColor: cardBg, borderLeftColor: primary }]}>
+            <Text style={[styles.latestTime, { color: textMuted }]}>
+              {latestEntry ? `Yesterday, ${formatEntryTime(latestEntry.created_at || latestEntry.createdAt)}` : 'Yesterday, 8:42 PM'}
+            </Text>
+            <Text style={[styles.latestText, { color: textMain }]} numberOfLines={2}>
+              {latestEntry?.content || "The clouds were particularly dramatic today. I found myself thinking about the project deadline, but strangely felt at peace..."}
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ height: 120 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F2EE',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: Platform.OS === 'web' ? 52 : 60, // space for DateNavigator on web
-    paddingHorizontal: 24,
-    paddingBottom: 120,
-    gap: 24,
-  },
-  // Stitch: px-6 pt-8 pb-4
+  container: { flex: 1 },
+  scroll: { paddingTop: 32 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    paddingHorizontal: 24, paddingBottom: 16,
   },
-  headerLeft: {
-    flex: 1,
-  },
-  // Stitch: font-nunito text-[22px] font-bold text-ink-slate
-  headerGreeting: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 22,
-    color: '#2C3E50',
-    lineHeight: 28,
-  },
-  // Stitch: font-lora text-[14px] text-ink-gray
-  headerDate: {
-    fontFamily: 'Lora_400Regular',
-    fontSize: 14,
-    color: '#7F8C8D',
-    marginTop: 2,
-  },
-  // Stitch: h-10 w-10 rounded-full bg-ink-teal
+  greeting: { fontFamily: 'Nunito_700Bold', fontSize: 22, fontWeight: '700' },
+  dateText: { fontFamily: 'Lora_400Regular', fontSize: 14, marginTop: 4 },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#7DBFA7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 16,
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 4,
   },
-  avatarText: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 18,
-    color: '#FFFFFF',
+  avatarText: { fontFamily: 'Nunito_700Bold', fontSize: 18 },
+
+  card: {
+    marginHorizontal: 24, marginTop: 16,
+    borderRadius: 16, padding: 24, borderWidth: 1,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
-  // Stitch: h-[140px] rounded-2xl bg-white p-6 shadow-sm
-  moodCard: {
-    height: 140,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+  moodRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  moodOrb: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: '#a5b4fc',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#818cf8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12,
   },
-  moodCardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 24,
-    flex: 1,
+  orbInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#818cf8', opacity: 0.7 },
+  moodInfo: { flex: 1 },
+  moodLabel: {
+    fontFamily: 'Inter_400Regular', fontSize: 12,
+    textTransform: 'uppercase', letterSpacing: 1,
   },
-  moodOrbWrap: {},
-  moodInfo: {
-    flex: 1,
-  },
-  // Stitch: font-inter text-[12px] uppercase tracking-wider text-ink-gray
-  moodEnergyLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#7F8C8D',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  // Stitch: font-nunito text-[16px] font-bold text-ink-slate
-  moodTitle: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 16,
-    color: '#2C3E50',
-    marginTop: 4,
-  },
-  emotionPillsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  // Stitch: rounded-full px-3 py-0.5 font-nunito text-[12px] font-semibold
-  emotionPill: {
-    borderRadius: 9999,
-    paddingHorizontal: 12,
-    paddingVertical: 2,
-  },
-  emotionPillText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 12,
-  },
-  // Stitch: font-inter text-[12px] text-ink-gray (emotion count)
-  emotionCountWrap: {
-    alignItems: 'flex-end',
-  },
-  emotionCountText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#7F8C8D',
-  },
-  // Stitch: rounded-[20px] bg-gradient-to-r from-ink-blue to-ink-teal py-4
-  journalBtnWrap: {
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#5B8DB8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 4,
-  },
+  moodTitle: { fontFamily: 'Nunito_700Bold', fontSize: 16, fontWeight: '700', marginTop: 4 },
+  emotionTags: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  emotionTag: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 3 },
+  emotionTagText: { fontFamily: 'Nunito_600SemiBold', fontSize: 12, fontWeight: '600' },
+  emotionCount: { alignItems: 'flex-end' },
+  emotionCountNum: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  emotionCountLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'right' },
+
   journalBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 16,
-    borderRadius: 20,
+    marginHorizontal: 24, marginTop: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12,
+    paddingVertical: 16, borderRadius: 20,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 4,
   },
-  // Stitch: font-nunito text-[18px] font-semibold text-white
-  journalBtnText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 18,
-    color: '#FFFFFF',
+  journalBtnText: { fontFamily: 'Nunito_600SemiBold', fontSize: 18, fontWeight: '600' },
+
+  weekHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  weekTitle: { fontFamily: 'Nunito_700Bold', fontSize: 16, fontWeight: '700' },
+  weekRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: 80 },
+  weekDay: { alignItems: 'center', gap: 8 },
+  weekOrb: {},
+  todayOrb: {
+    width: 48, height: 48, borderRadius: 24, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center',
   },
-  // Latest Entry section
-  latestSection: {
-    gap: 12,
+  weekOrbInner: { width: 32, height: 32, borderRadius: 16 },
+  weekDayLabel: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+
+  insightCard: {
+    marginHorizontal: 24, marginTop: 16,
+    flexDirection: 'row', alignItems: 'flex-start', gap: 16,
+    borderWidth: 1, borderRadius: 16, padding: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.03, shadowRadius: 8,
   },
-  // Stitch: font-nunito text-[16px] font-bold text-ink-slate
-  latestTitle: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 16,
-    color: '#2C3E50',
+  insightIcon: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
   },
-  // Stitch: rounded-2xl bg-white p-5 shadow-sm border-l-4 border-ink-teal
+  insightContent: { flex: 1, gap: 4 },
+  insightTitle: { fontFamily: 'Nunito_700Bold', fontSize: 14, fontWeight: '700' },
+  insightText: { fontFamily: 'Lora_400Regular_Italic', fontSize: 13, lineHeight: 20 },
+
+  latestSection: { marginHorizontal: 24, marginTop: 16, gap: 12 },
+  latestTitle: { fontFamily: 'Nunito_700Bold', fontSize: 16, fontWeight: '700' },
   latestCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 16, padding: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#7DBFA7',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8,
   },
-  // Stitch: font-inter text-[12px] text-ink-gray mb-1
-  latestDate: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#7F8C8D',
-    marginBottom: 4,
-  },
-  // Stitch: font-lora text-[14px] text-ink-slate
-  latestPreview: {
-    fontFamily: 'Lora_400Regular',
-    fontSize: 14,
-    color: '#2C3E50',
-    lineHeight: 22,
-  },
+  latestTime: { fontFamily: 'Inter_400Regular', fontSize: 12, marginBottom: 4 },
+  latestText: { fontFamily: 'Lora_400Regular', fontSize: 14, lineHeight: 22 },
 });

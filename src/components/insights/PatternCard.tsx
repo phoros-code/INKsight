@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   message: {
     fontFamily: 'Lora_400Regular',
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: Colors.textDark,
     lineHeight: 24,
   },
 });

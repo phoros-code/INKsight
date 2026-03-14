@@ -1,241 +1,182 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-// MMKV handled web-safe
-import { Platform } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-
-import { PlutchikWheel, WHEEL_SEGMENTS } from '../../src/components/ui/PlutchikWheel';
 import { Colors } from '../../src/constants/colors';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Svg, Path } from 'react-native-svg';
 
-const MMKV_Class = Platform.OS !== 'web' ? require('react-native-mmkv').MMKV : null;
-const storage = MMKV_Class ? new MMKV_Class() : { getString: () => null, getBoolean: () => false, set: () => {} };
+const EMOTIONS = [
+  { name: 'Joy', color: Colors.emotionJoy, subs: ['ecstatic', 'cheerful', 'serene', 'optimistic'] },
+  { name: 'Trust', color: Colors.emotionTrust, subs: ['admiring', 'accepting', 'appreciative', 'trusting'] },
+  { name: 'Fear', color: Colors.emotionFear, subs: ['anxious', 'worried', 'uneasy', 'nervous'] },
+  { name: 'Surprise', color: Colors.emotionSurprise, subs: ['amazed', 'startled', 'confused', 'astonished'] },
+  { name: 'Sadness', color: Colors.emotionSadness, subs: ['lonely', 'melancholic', 'empty', 'gloomy'] },
+  { name: 'Disgust', color: Colors.emotionDisgust, subs: ['bored', 'averse', 'disapproving', 'repelled'] },
+  { name: 'Anger', color: Colors.emotionAnger, subs: ['irritated', 'frustrated', 'hostile', 'enraged'] },
+  { name: 'Anticipation', color: Colors.emotionAnticipation, subs: ['eager', 'curious', 'vigilant', 'hopeful'] },
+];
 
 export default function EmotionWheelModal() {
   const router = useRouter();
+  const [selected, setSelected] = useState(4); // Sadness
+  const [selectedSub, setSelectedSub] = useState('melancholic');
 
-  // Selected state
-  const [selectedMainEmotion, setSelectedMainEmotion] = useState<{ segmentName: string, variant: string } | null>(null);
-  const [selectedSecondary, setSelectedSecondary] = useState<string[]>([]);
-
-  const handleWheelSelect = (segment: any, variantIndex: number) => {
-    const variantName = segment.variants[variantIndex];
-    setSelectedMainEmotion({
-      segmentName: segment.name,
-      variant: variantName
-    });
-    // Reset secondaries if base branch changes
-    setSelectedSecondary([]);
-  };
-
-  const toggleSecondary = (emotion: string) => {
-    Haptics.selectionAsync();
-    setSelectedSecondary(prev => 
-      prev.includes(emotion) ? prev.filter(e => e !== emotion) : [...prev, emotion]
-    );
-  };
-
-  const handleSave = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
-    // Aggregate selections
-    const finalEmotions = [];
-    if (selectedMainEmotion) {
-      finalEmotions.push(selectedMainEmotion.variant);
-    }
-    finalEmotions.push(...selectedSecondary);
-
-    if (finalEmotions.length > 0) {
-      // Pass back via MMKV temp key or context
-      const existingStr = storage.getString('temp_wheel_params');
-      const existingArray = existingStr ? JSON.parse(existingStr) : [];
-      
-      const merged = Array.from(new Set([...existingArray, ...finalEmotions]));
-      storage.set('temp_wheel_params', JSON.stringify(merged));
-    }
-
-    router.back();
-  };
-
-  const handleSkip = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.back();
-  };
-
-  // Derive variants for the selected segment
-  const activeSegment = selectedMainEmotion 
-    ? WHEEL_SEGMENTS.find(s => s.name === selectedMainEmotion.segmentName) 
-    : null;
+  const currentEmotion = EMOTIONS[selected];
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.brandText}>INKsight</Text>
-        <Text style={styles.title}>What are you feeling?</Text>
-        <Text style={styles.subtitle}>Tap the emotion that feels closest. Then go deeper.</Text>
-      </View>
-
-      {/* WHEEL CENTERPIECE */}
-      <View style={styles.wheelContainer}>
-        <PlutchikWheel 
-          onEmotionSelect={handleWheelSelect} 
-          selectedEmotion={selectedMainEmotion?.variant}
-        />
-      </View>
-
-      {/* DYNAMIC SELECTION */}
-      <View style={styles.selectionZone}>
-        <Text style={styles.selectedTitle}>
-          {selectedMainEmotion ? selectedMainEmotion.variant : "I feel..."}
-        </Text>
-
-        {/* SECONDARY ROW */}
-        {activeSegment && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.secondaryScroll}>
-            {activeSegment.variants.map((v, idx) => {
-              if (v === selectedMainEmotion?.variant) return null; // hide already selected base
-
-              const isSelected = selectedSecondary.includes(v);
-              return (
-                <TouchableOpacity
-                  key={idx}
-                  activeOpacity={0.7}
-                  onPress={() => toggleSecondary(v)}
-                  style={[styles.chip, isSelected && styles.chipSelected]}
-                >
-                  <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{v}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-
-      <View style={styles.spacer} />
-
-      {/* BOTTOM ACTIONS */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity 
-          style={[styles.saveButton, !selectedMainEmotion && { opacity: 0.5 }]} 
-          onPress={handleSave}
-          disabled={!selectedMainEmotion}
-        >
-          <Text style={styles.saveButtonText}>Add to Journal</Text>
+      {/* Top Nav */}
+      <View style={styles.topNav}>
+        <TouchableOpacity style={styles.navBtn} onPress={() => router.back()}>
+          <MaterialIcons name="arrow-back" size={24} color={Colors.darkUiAccent} />
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.skipLink} onPress={handleSkip}>
-          <Text style={styles.skipLinkText}>Skip for now</Text>
-        </TouchableOpacity>
+        <Text style={styles.navTitle}>INKsight</Text>
+        <View style={{ width: 40 }} />
       </View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <Text style={styles.headline}>What are you feeling?</Text>
+        <Text style={styles.subline}>Tap the emotion that feels closest. Then go deeper.</Text>
+
+        {/* Emotion Wheel */}
+        <View style={styles.wheelContainer}>
+          <View style={[styles.wheelGlow, { backgroundColor: currentEmotion.color + '33' }]} />
+
+          <Svg width={280} height={280} viewBox="0 0 100 100" style={styles.wheelSvg}>
+            {/* Outer ring */}
+            {EMOTIONS.map((em, i) => (
+              <Path
+                key={`outer-${i}`}
+                d="M50,50 L50,0 A50,50 0 0,1 85.3,14.7 Z"
+                fill={em.color}
+                opacity={selected === i ? 0.7 : 0.4}
+                rotation={i * 45}
+                origin="50, 50"
+                onPress={() => setSelected(i)}
+              />
+            ))}
+            {/* Middle ring */}
+            {EMOTIONS.map((em, i) => (
+              <Path
+                key={`mid-${i}`}
+                d="M50,50 L50,15 A35,35 0 0,1 74.7,25.3 Z"
+                fill={em.color}
+                opacity={0.7}
+                rotation={i * 45}
+                origin="50, 50"
+                onPress={() => setSelected(i)}
+              />
+            ))}
+            {/* Inner ring */}
+            {EMOTIONS.map((em, i) => (
+              <Path
+                key={`inner-${i}`}
+                d="M50,50 L50,30 A20,20 0 0,1 64.1,35.9 Z"
+                fill={em.color}
+                opacity={1}
+                rotation={i * 45}
+                origin="50, 50"
+                onPress={() => setSelected(i)}
+              />
+            ))}
+          </Svg>
+
+          {/* Center Label */}
+          <View style={styles.centerCircle}>
+            <Text style={styles.centerText}>{currentEmotion.name}</Text>
+          </View>
+        </View>
+
+        {/* Selected Emotion */}
+        <Text style={styles.emotionLabel}>{currentEmotion.name}</Text>
+
+        {/* Sub-emotion chips */}
+        <View style={styles.subChips}>
+          {currentEmotion.subs.map(sub => (
+            <TouchableOpacity
+              key={sub}
+              style={[styles.subChip, selectedSub === sub && styles.subChipActive]}
+              onPress={() => setSelectedSub(sub)}
+            >
+              <Text style={[styles.subChipText, selectedSub === sub && styles.subChipTextActive]}>{sub}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Actions */}
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()} activeOpacity={0.9}>
+          <Text style={styles.primaryBtnText}>Add to Journal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.skipText}>Skip for now</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1E2A3A',
+  container: { flex: 1, backgroundColor: Colors.darkBg },
+  topNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 24, paddingBottom: 8,
   },
-  header: {
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    marginBottom: 40,
+  navBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  navTitle: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: '#FFFFFF', fontWeight: '700' },
+
+  scroll: { alignItems: 'center', paddingHorizontal: 16, paddingBottom: 60 },
+
+  headline: {
+    fontFamily: 'Nunito_700Bold', fontSize: 22, color: '#FFFFFF', fontWeight: '700',
+    textAlign: 'center', marginBottom: 8, marginTop: 16, letterSpacing: -0.3,
   },
-  title: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 22,
-    color: '#FFFFFF',
-    marginBottom: 8,
+  subline: {
+    fontFamily: 'Lora_400Regular_Italic', fontSize: 14, color: Colors.darkUiAccent,
+    textAlign: 'center', marginBottom: 40,
   },
-  brandText: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 14,
-    color: Colors.primary,
-    letterSpacing: 2,
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 14,
-    color: '#8AA8C4',
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 10,
-  },
+
   wheelContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 20,
+    width: 280, height: 280, alignItems: 'center', justifyContent: 'center', marginBottom: 48,
   },
-  selectionZone: {
-    minHeight: 120,
-    alignItems: 'center',
-    marginTop: 20,
+  wheelGlow: {
+    position: 'absolute', width: 280, height: 280, borderRadius: 140,
   },
-  selectedTitle: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 24,
-    color: '#FFFFFF',
-    marginBottom: 16,
+  wheelSvg: {
+    transform: [{ rotate: '-22.5deg' }],
   },
-  secondaryScroll: {
-    paddingHorizontal: 24,
-    alignItems: 'center',
+  centerCircle: {
+    position: 'absolute', width: 60, height: 60, borderRadius: 30,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: Colors.darkBg,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8,
   },
-  chip: {
-    backgroundColor: '#253447',
-    borderWidth: 1,
-    borderColor: '#3A4E63',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    marginRight: 12,
+  centerText: {
+    fontFamily: 'Nunito_700Bold', fontSize: 10, color: Colors.darkBg, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: -0.5,
   },
-  chipSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+
+  emotionLabel: {
+    fontFamily: 'Nunito_700Bold', fontSize: 20, color: '#FFFFFF', fontWeight: '700', marginBottom: 24,
   },
-  chipText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: '#8AA8C4',
+
+  subChips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginBottom: 48, paddingHorizontal: 24 },
+  subChip: {
+    paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: Colors.darkUiDeep, borderWidth: 1, borderColor: '#FFFFFF0D',
   },
-  chipTextSelected: {
-    color: '#FFFFFF',
+  subChipActive: {
+    borderColor: Colors.primary + '66',
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10,
   },
-  spacer: {
-    flex: 1,
+  subChipText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.darkUiAccent, fontWeight: '500' },
+  subChipTextActive: { color: Colors.primary, fontWeight: '700' },
+
+  primaryBtn: {
+    width: 280, paddingVertical: 16, borderRadius: 28,
+    backgroundColor: Colors.primary, alignItems: 'center', marginBottom: 24,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 12,
   },
-  bottomActions: {
-    paddingHorizontal: 24,
-    paddingBottom: 50,
-    alignItems: 'center',
-  },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    width: '100%',
-    height: 56,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  saveButtonText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
-  skipLink: {
-    padding: 10,
-  },
-  skipLinkText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: '#8AA8C4',
-  },
+  primaryBtnText: { fontFamily: 'Nunito_700Bold', fontSize: 16, color: '#FFFFFF', fontWeight: '700' },
+  skipText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.darkUiAccent, fontWeight: '500' },
 });

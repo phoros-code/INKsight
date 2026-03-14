@@ -1,133 +1,45 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-import Svg, { Path } from 'react-native-svg';
-import Animated, {
-  useSharedValue,
-  useAnimatedProps,
-  withRepeat,
-  withTiming,
-  withSequence,
-  Easing,
-} from 'react-native-reanimated';
 import { Colors } from '../../src/constants/colors';
-
-const { width } = Dimensions.get('window');
-const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function WelcomeScreen() {
   const router = useRouter();
 
-  // Animation values for the bezier curves
-  const shift1 = useSharedValue(0);
-  const shift2 = useSharedValue(0);
-  const shift3 = useSharedValue(0);
-
-  useEffect(() => {
-    shift1.value = withRepeat(
-      withSequence(
-        withTiming(30, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 4000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    shift2.value = withRepeat(
-      withSequence(
-        withTiming(-25, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 5000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    shift3.value = withRepeat(
-      withSequence(
-        withTiming(20, { duration: 6000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 6000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedProps1 = useAnimatedProps(() => {
-    const s = shift1.value;
-    return {
-      d: `M-20,100 C${100 + s},0 ${200 - s},300 ${width + 20},150`,
-    };
-  });
-
-  const animatedProps2 = useAnimatedProps(() => {
-    const s = shift2.value;
-    return {
-      d: `M-20,150 C${150 + s},300 ${250 - s},50 ${width + 20},200`,
-    };
-  });
-
-  const animatedProps3 = useAnimatedProps(() => {
-    const s = shift3.value;
-    return {
-      d: `M-20,200 C${120 + s},100 ${280 - s},280 ${width + 20},100`,
-    };
-  });
-
-  const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/onboarding/privacy');
-  };
-
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-
-      {/* Abstract Animated Ink Strokes Background */}
-      <View style={styles.svgContainer}>
-        <Svg width={width} height={400}>
-          <AnimatedPath
-            animatedProps={animatedProps1}
-            fill="none"
-            stroke={Colors.primary}
-            strokeWidth={3}
-            opacity={0.7}
-          />
-          <AnimatedPath
-            animatedProps={animatedProps2}
-            fill="none"
-            stroke={Colors.secondary}
-            strokeWidth={3}
-            opacity={0.7}
-          />
-          <AnimatedPath
-            animatedProps={animatedProps3}
-            fill="none"
-            stroke={Colors.accent}
-            strokeWidth={3}
-            opacity={0.7}
-          />
-        </Svg>
+      {/* Watercolor Hero Area */}
+      <View style={styles.heroArea}>
+        <View style={styles.heroGradient} />
+        <View style={styles.heroWash1} />
+        <View style={styles.heroWash2} />
+        <View style={styles.heroFade} />
       </View>
 
+      {/* Content */}
       <View style={styles.content}>
-        <View style={styles.textContainer}>
-          <Text style={styles.heading}>
-            Your mind has patterns.{'\n'}Let's discover them together.
-          </Text>
-          <Text style={styles.body}>
-            INKsight is your private reflection companion. No judgments. No
-            diagnoses. Just you and your words.
-          </Text>
-        </View>
+        <Text style={styles.headline}>
+          Your mind has patterns.{'\n'}Let's discover them together.
+        </Text>
+        <Text style={styles.description}>
+          INKsight is your private reflection companion. No judgments. No diagnoses. Just you and your words.
+        </Text>
+      </View>
 
-        <TouchableOpacity style={styles.ctaButton} onPress={handleNext}>
-          <Text style={styles.ctaText}>Begin Your Journey</Text>
+      {/* Bottom Actions */}
+      <View style={styles.bottomSection}>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push('/onboarding/privacy')}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.primaryButtonText}>Begin Your Journey</Text>
         </TouchableOpacity>
 
-        <View style={styles.progressContainer}>
-          <View style={[styles.dot, styles.activeDot]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
+        <View style={styles.progressDots}>
+          <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
+          <View style={[styles.dot, { backgroundColor: Colors.dotInactive }]} />
+          <View style={[styles.dot, { backgroundColor: Colors.dotInactive }]} />
         </View>
       </View>
     </View>
@@ -138,64 +50,108 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    maxWidth: 448,
+    alignSelf: 'center',
+    width: '100%',
   },
-  svgContainer: {
-    height: '45%',
+  heroArea: {
+    height: '40%',
     width: '100%',
     overflow: 'hidden',
+    position: 'relative',
+  },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Colors.primary,
+    opacity: 0.06,
+  },
+  heroWash1: {
+    position: 'absolute',
+    top: 30,
+    left: -20,
+    width: '130%',
+    height: '80%',
+    backgroundColor: Colors.primary,
+    opacity: 0.07,
+    borderRadius: 100,
+    transform: [{ rotate: '-15deg' }],
+  },
+  heroWash2: {
+    position: 'absolute',
+    bottom: 40,
+    right: -20,
+    width: '100%',
+    height: '50%',
+    backgroundColor: Colors.sage,
+    opacity: 0.06,
+    borderRadius: 80,
+    transform: [{ rotate: '10deg' }],
+  },
+  heroFade: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 96,
+    backgroundColor: Colors.background,
+    opacity: 0.9,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-    paddingBottom: 50,
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 24,
   },
-  textContainer: {
-    marginTop: -20,
-  },
-  heading: {
+  headline: {
     fontFamily: 'Nunito_700Bold',
-    fontSize: 26,
-    color: Colors.textPrimary,
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.textDark,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 34,
+    lineHeight: 36,
+    marginBottom: 24,
   },
-  body: {
+  description: {
     fontFamily: 'Lora_400Regular',
     fontSize: 15,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     textAlign: 'center',
     lineHeight: 25,
-    paddingHorizontal: 10,
+    maxWidth: 320,
   },
-  ctaButton: {
-    backgroundColor: Colors.primary,
-    height: 56,
-    borderRadius: 30,
-    justifyContent: 'center',
+  bottomSection: {
+    paddingHorizontal: 32,
+    paddingBottom: 40,
     alignItems: 'center',
-    marginTop: 40,
+    gap: 32,
   },
-  ctaText: {
+  primaryButton: {
+    width: '100%',
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  primaryButtonText: {
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 16,
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
-  progressContainer: {
+  progressDots: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 30,
+    gap: 12,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D4DEE8',
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: Colors.primary,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
 });

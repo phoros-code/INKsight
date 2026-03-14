@@ -1,492 +1,216 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated as RNAnimated, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useDatabase } from '../../src/utils/webSafe';
-// Haptics: use SafeHaptics from webSafe instead
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-const Sharing = Platform.OS !== 'web'
-  ? require('expo-sharing')
-  : { isAvailableAsync: async () => false, shareAsync: async () => {} };
-import ViewShot from 'react-native-view-shot';
-import { format, subDays } from 'date-fns';
-import { Feather } from '@expo/vector-icons';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  Easing
-} from 'react-native-reanimated';
-
 import { Colors } from '../../src/constants/colors';
-import { JournalEntry } from '../../src/types';
-import { getEntriesByRange } from '../../src/database/journalDB';
-import { getCheckinsForRange } from '../../src/database/checkinDB';
-import { generateWeeklyPatterns } from '../../src/services/patternEngine';
-import { DonutChart } from '../../src/components/insights/DonutChart';
-
-// Custom Animated Number component
-const AnimatedNumber = ({ value }: { value: number }) => {
-  const [displayValue, setDisplayValue] = useState(0);
-  const animValue = useRef(new RNAnimated.Value(0)).current;
-
-  useEffect(() => {
-    RNAnimated.timing(animValue, {
-      toValue: value,
-      duration: 1500,
-      useNativeDriver: true, // We're interpolating state so fake it visually
-    }).start();
-
-    animValue.addListener((v) => {
-      setDisplayValue(Math.floor(v.value));
-    });
-
-    return () => animValue.removeAllListeners();
-  }, [value]);
-
-  return <Text style={styles.statScore}>{displayValue}</Text>;
-};
+import { MaterialIcons } from '@expo/vector-icons';
+import { webStore } from '../../src/database/webDataStore';
 
 export default function WeeklySummaryModal() {
   const router = useRouter();
-  const db = useDatabase();
-  const viewShotRef = useRef<ViewShot>(null);
-
-  // States
-  const [dateRangeStr, setDateRangeStr] = useState('');
-  const [stats, setStats] = useState({ totalEntries: 0, totalWords: 0, avgTime: 'N/A' });
-  const [dominantEmotion, setDominantEmotion] = useState<{ name: string, color: string, percent: number }>({ name: 'Neutral', color: Colors.emotionNeutral, percent: 0 });
-  const [secondaryEmotions, setSecondaryEmotions] = useState<string[]>([]);
-  const [topSentence, setTopSentence] = useState({ text: '', date: '' });
-  const [insightMessage, setInsightMessage] = useState('');
-  const [vocabGrowth, setVocabGrowth] = useState(0);
-  
-  // Opacity mounts
-  const fadeAnim = useSharedValue(0);
+  const [stats, setStats] = useState({ entries: 12, words: '4.2k', avgTime: '15m' });
+  const [bestSentence, setBestSentence] = useState(
+    '"The stars don\'t just exist to be seen; they exist to remind us that even the smallest light matters in a vast dark sky."'
+  );
+  const [dominantEmotion, setDominantEmotion] = useState('Reflective');
+  const [subEmotions, setSubEmotions] = useState(['Calm', 'Curious', 'Grateful']);
 
   useEffect(() => {
-    fadeAnim.value = withTiming(1, { duration: 800 });
-    computeWeeklySummary();
-  }, []);
-
-  const computeWeeklySummary = async () => {
-    try {
-      const todayDate = new Date();
-      const startDate = subDays(todayDate, 6).toISOString().split('T')[0];
-      const endDate = todayDate.toISOString().split('T')[0];
-
-      setDateRangeStr(`${format(subDays(todayDate, 6), 'MMM d')} – ${format(todayDate, 'd, yyyy')}`);
-
-      const entries = await getEntriesByRange(db, startDate, endDate);
-      const checkins = await getCheckinsForRange(db, startDate, endDate);
-
-      if (entries.length === 0) return;
-
-      // 1. Basic Stats
-      const totalWords = entries.reduce((acc, e) => acc + (e.wordCount || 0), 0);
-      
-      // Rough Average Time (Parse date strings heuristically if missing exact timestamps)
-      const hours = entries.map(e => new Date(e.date).getHours());
-      let modeHour = hours.sort((a,b) =>
-            hours.filter(v => v===a).length - hours.filter(v => v===b).length
-      ).pop() || 12;
-      const ampm = modeHour >= 12 ? 'PM' : 'AM';
-      modeHour = modeHour % 12 || 12;
-
+    if (Platform.OS === 'web') {
+      const entries = webStore.getAllEntries();
+      const weekEntries = entries.slice(0, 7);
+      const wordCount = weekEntries.reduce((sum, e) => sum + (e.word_count || 0), 0);
       setStats({
-         totalEntries: entries.length,
-         totalWords,
-         avgTime: `${modeHour} ${ampm}`
+        entries: weekEntries.length,
+        words: wordCount > 1000 ? `${(wordCount / 1000).toFixed(1)}k` : String(wordCount),
+        avgTime: '15m',
       });
-
-      // 2. Emotion Counting
-      const eCounts: Record<string, { count: number, color: string }> = {};
-      entries.forEach(e => {
-         if (e.dominantEmotion) {
-            const n = e.dominantEmotion.emotion;
-            if(!eCounts[n]) eCounts[n] = { count: 0, color: e.dominantEmotion.color };
-            eCounts[n].count++;
-         }
-      });
-      const sortedE = Object.entries(eCounts).sort((a, b) => b[1].count - a[1].count);
-      
-      if (sortedE.length > 0) {
-         const topCount = sortedE[0][1].count;
-         const totalCount = entries.length;
-         const percent = Math.round((topCount / totalCount) * 100);
-         setDominantEmotion({ name: sortedE[0][0], color: sortedE[0][1].color, percent });
-         setSecondaryEmotions(sortedE.slice(1, 4).map(e => e[0]));
-      }
-
-      // 3. Top Sentence (Naive selection via vocab score or length)
-      let bestEntry = entries[0];
-      let maxScore = -1;
-      entries.forEach(e => {
-         const score = e.linguisticScore?.vocabularyScore || e.wordCount;
-         if (score > maxScore) {
-            maxScore = score;
-            bestEntry = e;
-         }
-      });
-
-      // Extract a decent sentence (naive regex split string)
-      if (bestEntry && bestEntry.content) {
-         const sentences = bestEntry.content.match(/[^\.!\?]+[\.!\?]+/g) || [bestEntry.content];
-         const longest = sentences.sort((a, b) => b.length - a.length)[0].trim();
-         setTopSentence({ 
-            text: longest, 
-            date: format(new Date(bestEntry.date), 'MMM d') 
-         });
-      }
-
-      // 4. AI Insight
-      const patterns = generateWeeklyPatterns(entries, checkins);
-      if (patterns.length > 0) {
-         setInsightMessage(patterns[0].message);
-      } else {
-         setInsightMessage("You consistently checked in with yourself this week. That alone is powerful.");
-      }
-
-      // 5. Vocab Growth (Fake mock for effect, usually needs distinct 2 week query)
-      const allUniqueWords = new Set();
-      entries.forEach(e => e.detectedEmotions?.forEach(em => allUniqueWords.add(em.emotion)));
-      if (allUniqueWords.size >= 4) setVocabGrowth(allUniqueWords.size - 2);
-
-    } catch (e) {
-      console.error('Failed sum', e);
-    }
-  };
-
-  const handleShare = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      if (viewShotRef.current && viewShotRef.current.capture) {
-        const uri = await viewShotRef.current.capture();
-        const canShare = await Sharing.isAvailableAsync();
-        if (canShare) {
-          await Sharing.shareAsync(uri, { dialogTitle: 'My INKsight Week' });
+      // Find longest/best sentence
+      if (weekEntries.length > 0) {
+        const longest = weekEntries.reduce((best, e) =>
+          (e.content?.length || 0) > (best.content?.length || 0) ? e : best
+        , weekEntries[0]);
+        const sentences = (longest.content || '').split(/[.!?]+/).filter(s => s.trim().length > 20);
+        if (sentences.length > 0) {
+          setBestSentence(`"${sentences[0].trim()}."`);
         }
       }
-    } catch (e) {
-      console.error('Share err', e);
     }
-  };
+  }, []);
 
-  const animatedMain = useAnimatedStyle(() => ({
-    opacity: fadeAnim.value,
-    transform: [{ translateY: withSpring((1 - fadeAnim.value) * 30) }]
-  }));
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dateRange = `${months[weekAgo.getMonth()]} ${weekAgo.getDate()} – ${today.getDate()}, ${today.getFullYear()}`;
 
   return (
-    <LinearGradient colors={['#1E2A3A', '#2C3E50']} style={styles.container}>
-      <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* HEADER */}
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={styles.header}>
-           <Text style={styles.starEmoji}>🌟</Text>
-           <Text style={styles.title}>Your Week in Words</Text>
-           <Text style={styles.dateRange}>{dateRangeStr}</Text>
+          <Text style={styles.headerEmoji}>🌟</Text>
+          <Text style={styles.headerTitle}>Your Week in Words</Text>
+          <Text style={styles.headerDate}>{dateRange}</Text>
         </View>
 
-        {/* --- SHOT CONTAINER FOR EXPORT --- */}
-        <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }}>
-          <Animated.View style={[styles.shareableArea, animatedMain]}>
-            
-            {/* STATS ROW */}
-            <View style={styles.statsRow}>
-               <View style={styles.statCard}>
-                 <Text style={styles.statIcon}>📝</Text>
-                 <AnimatedNumber value={stats.totalEntries} />
-                 <Text style={styles.statLabel}>Entries</Text>
-               </View>
-               <View style={styles.statCard}>
-                 <Text style={styles.statIcon}>💭</Text>
-                 <AnimatedNumber value={stats.totalWords} />
-                 <Text style={styles.statLabel}>Words</Text>
-               </View>
-               <View style={styles.statCard}>
-                 <Text style={styles.statIcon}>🕐</Text>
-                 <Text style={styles.statScoreStr}>{stats.avgTime}</Text>
-                 <Text style={styles.statLabel}>Avg Time</Text>
-               </View>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {[
+            { icon: 'edit-note' as const, label: 'Entries', value: stats.entries },
+            { icon: 'menu-book' as const, label: 'Words', value: stats.words },
+            { icon: 'schedule' as const, label: 'Avg Time', value: stats.avgTime },
+          ].map((s, i) => (
+            <View key={i} style={styles.statCard}>
+              <MaterialIcons name={s.icon} size={20} color={Colors.darkUiAccent} />
+              <Text style={styles.statLabel}>{s.label}</Text>
+              <Text style={styles.statValue}>{s.value}</Text>
             </View>
+          ))}
+        </View>
 
-            {/* DOMINANT EMOTION CARD */}
-            <View style={styles.contentCard}>
-               <View style={styles.orbSide}>
-                 <DonutChart percentage={dominantEmotion.percent} color={dominantEmotion.color} size={64} strokeWidth={8} />
-               </View>
-               <View style={styles.emotionInfoSide}>
-                 <Text style={styles.cardHeaderSmall}>DOMINANT EMOTION</Text>
-                 <Text style={styles.dominantWord}>{dominantEmotion.name}</Text>
-                 {secondaryEmotions.length > 0 && (
-                   <View style={styles.secondaryEmotionsRow}>
-                     {secondaryEmotions.map((e, idx) => (
-                       <View key={idx} style={styles.secondaryPill}>
-                         <Text style={styles.secondaryText}>{e}</Text>
-                       </View>
-                     ))}
-                   </View>
-                 )}
-               </View>
+        {/* Dominant Emotion */}
+        <View style={styles.darkCard}>
+          <Text style={styles.darkCardLabel}>DOMINANT EMOTION</Text>
+          <View style={styles.emotionRow}>
+            <View style={styles.emotionOrb}>
+              <Text style={styles.emotionOrbText}>84%</Text>
             </View>
-
-            {/* AI INSIGHT */}
-            {insightMessage ? (
-              <View style={styles.insightCard}>
-                 <View style={styles.insightBorder} />
-                 <View style={styles.insightBody}>
-                   <Text style={styles.insightTitle}>INKsight noticed 💡</Text>
-                   <Text style={styles.insightText}>{insightMessage}</Text>
-                 </View>
+            <View style={styles.emotionInfo}>
+              <Text style={styles.emotionName}>{dominantEmotion}</Text>
+              <View style={styles.emotionChips}>
+                {subEmotions.map(e => (
+                  <View key={e} style={styles.emotionChip}>
+                    <Text style={styles.emotionChipText}>{e}</Text>
+                  </View>
+                ))}
               </View>
-            ) : null}
+            </View>
+          </View>
+        </View>
 
-            {/* TOP SENTENCE */}
-            {topSentence.text ? (
-              <View style={styles.contentCard}>
-                 <Text style={styles.cardHeaderSmall}>✨ WEEK'S BEST SENTENCE</Text>
-                 <Text style={styles.sentenceText}>"{topSentence.text}"</Text>
-                 <Text style={styles.sentenceDate}>{topSentence.date}</Text>
-              </View>
-            ) : null}
+        {/* Best Sentence */}
+        <View style={styles.darkCard}>
+          <View style={styles.quoteIcon}>
+            <MaterialIcons name="format-quote" size={32} color="#FFFFFF" />
+          </View>
+          <Text style={styles.darkCardLabel}>WEEK'S BEST SENTENCE</Text>
+          <Text style={styles.quoteText}>{bestSentence}</Text>
+        </View>
 
-            {/* VOCAB GROWTH */}
-            {vocabGrowth > 0 && (
-              <View style={styles.growthPill}>
-                 <Text style={styles.growthText}>+{vocabGrowth} new emotion words this week 📖</Text>
-              </View>
-            )}
+        {/* AI Insight */}
+        <View style={[styles.darkCard, { flexDirection: 'row', overflow: 'hidden' }]}>
+          <View style={styles.insightStripe} />
+          <View style={styles.insightContent}>
+            <View style={styles.insightHeader}>
+              <MaterialIcons name="auto-awesome" size={14} color="#E8A87C" />
+              <Text style={styles.insightLabel}>AI WEEKLY INSIGHT</Text>
+            </View>
+            <Text style={styles.insightText}>
+              You've been focusing heavily on internal growth this week. Your entries suggest a transition from seeking external validation to finding peace in your personal progress. Keep exploring the theme of 'quiet resilience' that appeared on Wednesday.
+            </Text>
+          </View>
+        </View>
 
-          </Animated.View>
-        </ViewShot>
+        {/* Actions */}
+        <TouchableOpacity style={styles.shareBtn}>
+          <MaterialIcons name="share" size={18} color={Colors.darkUiAccent} />
+          <Text style={styles.shareBtnText}>Share Summary</Text>
+        </TouchableOpacity>
 
-        <View style={styles.spacer} />
-
-        {/* BOTTOM ACTIONS */}
         <View style={styles.footer}>
-           <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-              <Feather name="share" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-              <Text style={styles.shareBtnText}>Share Summary</Text>
-           </TouchableOpacity>
-           
-           <TouchableOpacity 
-             style={styles.backBtn}
-             onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.back();
-             setTimeout(() => {
-               // Only attempt to navigate back to index if stack trace permits
-               router.navigate('/(tabs)/');
-             }, 500);
-             }}
-           >
-              <Text style={styles.backBtnText}>Back to Home</Text>
-           </TouchableOpacity>
+          <View style={styles.footerLock}>
+            <MaterialIcons name="lock" size={12} color={Colors.darkUiAccent + '99'} />
+            <Text style={styles.footerLockText}>Your reflections are private and encrypted.</Text>
+          </View>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.footerLink}>Back to Home</Text>
+          </TouchableOpacity>
         </View>
-
       </ScrollView>
-    </LinearGradient>
+
+      {/* Bottom gradient */}
+      <View style={styles.bottomGradient} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.darkBg,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 80,
-    marginBottom: 30,
-  },
-  starEmoji: {
-    fontSize: 32,
-    marginBottom: 12,
-  },
-  title: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 26,
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-  dateRange: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 14,
-    color: '#8AA8C4',
-  },
-  shareableArea: {
-    backgroundColor: 'transparent', // Inherit gradient mostly, or add slight dark overlay if needed
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 12,
-  },
+  scroll: { paddingBottom: 60 },
+
+  header: { alignItems: 'center', paddingTop: 32, paddingBottom: 24 },
+  headerEmoji: { fontSize: 28, marginBottom: 8 },
+  headerTitle: { fontFamily: 'Nunito_700Bold', fontSize: 26, color: '#FFFFFF', fontWeight: '700' },
+  headerDate: { fontFamily: 'Lora_400Regular_Italic', fontSize: 14, color: Colors.darkUiAccent, marginTop: 4 },
+
+  statsGrid: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginBottom: 24 },
   statCard: {
-    flex: 1,
-    backgroundColor: '#253447',
-    borderRadius: 16,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-  },
-  statIcon: {
-    fontSize: 18,
-    marginBottom: 8,
-  },
-  statScore: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 26,
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  statScoreStr: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    color: '#FFFFFF',
-    marginBottom: 4,
+    flex: 1, backgroundColor: Colors.darkCard, borderRadius: 16, padding: 16,
+    alignItems: 'center', borderWidth: 1, borderColor: '#FFFFFF0D',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8,
   },
   statLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: '#8AA8C4',
+    fontFamily: 'Inter_600SemiBold', fontSize: 10, color: Colors.darkUiAccent,
+    textTransform: 'uppercase', letterSpacing: 1, marginTop: 4, fontWeight: '600',
   },
-  contentCard: {
-    backgroundColor: '#253447',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+  statValue: { fontFamily: 'Inter_700Bold', fontSize: 24, color: '#FFFFFF', fontWeight: '700', marginTop: 4 },
+
+  darkCard: {
+    marginHorizontal: 16, marginBottom: 16,
+    backgroundColor: Colors.darkCard, borderRadius: 16, padding: 20,
+    borderWidth: 1, borderColor: '#FFFFFF0D',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12,
   },
-  orbSide: {
-    marginRight: 20,
+  darkCardLabel: {
+    fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.darkUiAccent,
+    letterSpacing: 2, marginBottom: 16, fontWeight: '700',
   },
-  emotionInfoSide: {
-    flex: 1,
+
+  emotionRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  emotionOrb: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#6366f1',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#a855f7', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 20,
   },
-  cardHeaderSmall: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: '#8AA8C4',
-    marginBottom: 6,
+  emotionOrbText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: '#FFFFFF', fontWeight: '700' },
+  emotionInfo: { flex: 1 },
+  emotionName: { fontFamily: 'Inter_700Bold', fontSize: 20, color: '#FFFFFF', fontWeight: '700', marginBottom: 8 },
+  emotionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  emotionChip: {
+    paddingHorizontal: 8, paddingVertical: 4,
+    backgroundColor: '#FFFFFF0D', borderRadius: 12,
+    borderWidth: 1, borderColor: '#FFFFFF1A',
   },
-  dominantWord: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 22,
-    color: '#FFFFFF',
-    marginBottom: 8,
-    textTransform: 'capitalize',
-  },
-  secondaryEmotionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  secondaryPill: {
-    backgroundColor: '#1E2A3A',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  secondaryText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: '#8AA8C4',
-  },
-  sentenceText: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 17,
-    color: '#FFFFFF',
-    lineHeight: 28,
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  sentenceDate: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: '#8AA8C4',
-    textAlign: 'right',
-  },
-  insightCard: {
-    backgroundColor: '#253447',
-    borderRadius: 20,
-    marginBottom: 16,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  insightBorder: {
-    width: 4,
-    backgroundColor: '#E8A87C',
-  },
-  insightBody: {
-    flex: 1,
-    padding: 20,
-  },
-  insightTitle: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 15,
-    color: '#FFFFFF',
-    marginBottom: 6,
-  },
-  insightText: {
-    fontFamily: 'Lora_400Regular',
-    fontSize: 14,
-    color: '#8AA8C4',
-    lineHeight: 22,
-  },
-  growthPill: {
-    backgroundColor: '#7DBFA7',
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginTop: 4,
-  },
-  growthText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 13,
-    color: '#FFFFFF',
-  },
-  spacer: {
-    flex: 1,
-  },
-  footer: {
-    paddingHorizontal: 30,
-    marginTop: 20,
-  },
+  emotionChipText: { fontFamily: 'Inter_400Regular', fontSize: 10, color: Colors.darkUiAccent },
+
+  quoteIcon: { position: 'absolute', top: 12, right: 12, opacity: 0.1 },
+  quoteText: { fontFamily: 'Lora_400Regular_Italic', fontSize: 17, color: '#F1F5F9', lineHeight: 28 },
+
+  insightStripe: { width: 6, backgroundColor: '#E8A87C', marginRight: 0 },
+  insightContent: { flex: 1, paddingLeft: 20 },
+  insightHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  insightLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, color: '#E8A87C', letterSpacing: 2, fontWeight: '700' },
+  insightText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#CBD5E1', lineHeight: 22 },
+
   shareBtn: {
-    flexDirection: 'row',
-    height: 52,
-    borderWidth: 1.5,
-    borderColor: '#8AA8C4',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginHorizontal: 16, marginTop: 24, paddingVertical: 12,
+    borderRadius: 16, borderWidth: 1, borderColor: Colors.darkUiAccent,
   },
-  shareBtnText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 15,
-    color: '#FFFFFF',
-  },
-  backBtn: {
-    padding: 10,
-    alignItems: 'center',
-  },
-  backBtnText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: '#8AA8C4',
+  shareBtnText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.darkUiAccent, fontWeight: '700' },
+
+  footer: { alignItems: 'center', gap: 8, paddingVertical: 32 },
+  footerLock: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  footerLockText: { fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.darkUiAccent + '99' },
+  footerLink: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#EC5B13CC', fontWeight: '600' },
+
+  bottomGradient: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 128,
+    backgroundColor: Colors.darkBg, opacity: 0.5,
+    pointerEvents: 'none',
   },
 });

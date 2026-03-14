@@ -1,362 +1,211 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Linking, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming, 
-  withSequence, 
-  withRepeat,
-  Easing,
-  cancelAnimation
-} from 'react-native-reanimated';
-import Svg, { Defs, RadialGradient, Stop, Circle as SvgCircle } from 'react-native-svg';
-
 import { Colors } from '../../src/constants/colors';
-
-const AnimatedSvg = Animated.createAnimatedComponent(Svg);
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function SafeSpaceModal() {
   const router = useRouter();
-  
-  // Breathing Animation State
   const [isBreathing, setIsBreathing] = useState(false);
-  const [breatheText, setBreatheText] = useState('Breathe in... 4');
-  const scale = useSharedValue(1);
+  const [breathPhase, setBreathPhase] = useState('Breathe in...');
+  const breathAnim = useRef(new Animated.Value(0.8)).current;
+  const timerRef = useRef<any>(null);
+
+  const startBreathing = () => {
+    setIsBreathing(true);
+    runBreathCycle();
+  };
+
+  const runBreathCycle = () => {
+    // Breathe in (4s)
+    setBreathPhase('Breathe in...');
+    Animated.timing(breathAnim, { toValue: 1.2, duration: 4000, useNativeDriver: true }).start(() => {
+      // Hold (4s)
+      setBreathPhase('Hold...');
+      timerRef.current = setTimeout(() => {
+        // Breathe out (4s)
+        setBreathPhase('Breathe out...');
+        Animated.timing(breathAnim, { toValue: 0.8, duration: 4000, useNativeDriver: true }).start(() => {
+          runBreathCycle(); // Loop
+        });
+      }, 4000);
+    });
+  };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isBreathing) {
-      // 4s In, 2s Hold, 4s Out cycle = 10s total loop
-      scale.value = withRepeat(
-        withSequence(
-           withTiming(1.3, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-           withTiming(1.3, { duration: 2000 }), // Hold
-           withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1, // infinite
-        false
-      );
-
-      // Text Sync (approximate)
-      let phase = 'in'; // in, hold, out
-      let count = 4;
-      interval = setInterval(() => {
-         if (phase === 'in') {
-            setBreatheText(`Breathe in... ${count}`);
-            count--;
-            if (count === 0) { phase = 'hold'; count = 2; }
-         } else if (phase === 'hold') {
-            setBreatheText(`Hold... ${count}`);
-            count--;
-            if (count === 0) { phase = 'out'; count = 4; }
-         } else if (phase === 'out') {
-            setBreatheText(`Breathe out... ${count}`);
-            count--;
-            if (count === 0) { phase = 'in'; count = 4; }
-         }
-      }, 1000);
-
-    } else {
-       cancelAnimation(scale);
-       scale.value = withTiming(1);
-       setBreatheText('Start Breathing');
-    }
-
     return () => {
-       if (interval) clearInterval(interval);
-       cancelAnimation(scale);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [isBreathing]);
+  }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }]
-  }));
-
-  const handleCall = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    Linking.openURL('tel:9152987821');
-  };
-
-  const handleGrounding = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/modals/grounding');
-  };
-
-  const handleJournal = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Passing a param to indicate emergency mode
-    router.push('/(tabs)/journal?emergency=true'); 
-  };
+  const supportCards = [
+    { icon: 'call' as const, title: 'iCall India Helpline', desc: 'Professional counseling support', btn: 'Call', btnColor: Colors.safeTeal, iconBg: Colors.safeTeal + '15' },
+    { icon: 'anchor' as const, title: 'Grounding Technique', desc: 'Connect with the present moment', btn: 'Start', btnColor: Colors.safeBlue, iconBg: Colors.safeBlue + '15' },
+    { icon: 'edit-note' as const, title: 'Emergency Journal', desc: 'Release your thoughts safely', btn: 'Write', btnColor: Colors.safeWarm, iconBg: Colors.safeWarm + '15' },
+  ];
 
   return (
-    <LinearGradient colors={['#F0F6FB', '#EDF8F4']} style={styles.container}>
-      <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
-        {/* HEADER */}
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.heartEmoji}>💙</Text>
-          <Text style={styles.title}>This moment will pass.</Text>
-          <Text style={styles.subtitle}>
-            You don't have to feel this alone.{"\n"}We're here, and so are others.
+          <TouchableOpacity onPress={() => router.back()}>
+            <MaterialIcons name="close" size={24} color={Colors.safeTextMuted} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Safe Space</Text>
+          <View style={{ width: 48 }} />
+        </View>
+
+        {/* Hero */}
+        <View style={styles.hero}>
+          <Text style={styles.heroEmoji}>💙</Text>
+          <Text style={styles.heroTitle}>This moment will pass.</Text>
+          <Text style={styles.heroDesc}>
+            You don't have to feel this alone. We're here, and so are others.
           </Text>
         </View>
 
-        {/* BREATHING EXERCISE */}
-        <View style={styles.breathingCard}>
-           <TouchableOpacity 
-             activeOpacity={0.9} 
-             onPress={() => {
-                Haptics.selectionAsync();
-                setIsBreathing(!isBreathing);
-             }}
-             style={styles.breathingCenter}
-           >
-              <View style={styles.circleContainer}>
-                <AnimatedSvg height={80} width={80} style={animatedStyle}>
-                   <Defs>
-                     <RadialGradient id="breathGrad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                        <Stop offset="0%" stopColor={Colors.secondary} stopOpacity="1" />
-                        <Stop offset="100%" stopColor={Colors.primary} stopOpacity="0.6" />
-                     </RadialGradient>
-                   </Defs>
-                   <SvgCircle cx={40} cy={40} r={40} fill="url(#breathGrad)" />
-                </AnimatedSvg>
+        {/* Breathing Exercise */}
+        <View style={styles.breathCard}>
+          <View style={styles.breathCircleContainer}>
+            <Animated.View style={[styles.breathCircle, { transform: [{ scale: breathAnim }] }]}>
+              <Text style={styles.breathCircleText}>Breathe</Text>
+            </Animated.View>
+          </View>
+          <Text style={styles.breathTitle}>Breathing Exercise</Text>
+          <Text style={styles.breathPhase}>{isBreathing ? breathPhase : 'Breathe in...'}</Text>
+          <TouchableOpacity
+            style={styles.startBtn}
+            onPress={isBreathing ? () => { setIsBreathing(false); if(timerRef.current) clearTimeout(timerRef.current); breathAnim.setValue(0.8); } : startBreathing}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.startBtnText}>{isBreathing ? 'Stop' : 'Start Breathing'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Support Cards */}
+        <View style={styles.supportSection}>
+          <Text style={styles.supportLabel}>IMMEDIATE SUPPORT</Text>
+          {supportCards.map((card, i) => (
+            <View key={i} style={styles.supportCard}>
+              <View style={styles.supportCardLeft}>
+                <View style={[styles.supportIcon, { backgroundColor: card.iconBg }]}>
+                  <MaterialIcons name={card.icon} size={20} color={card.btnColor} />
+                </View>
+                <View>
+                  <Text style={styles.supportTitle}>{card.title}</Text>
+                  <Text style={styles.supportDesc}>{card.desc}</Text>
+                </View>
               </View>
-              <Text style={[styles.breathingText, isBreathing && styles.breathingTextActive]}>
-                {breatheText}
-              </Text>
-           </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.supportBtn, { backgroundColor: card.btnColor }]}
+                onPress={() => {
+                  if (card.btn === 'Call') Linking.openURL('tel:9152987821');
+                  if (card.btn === 'Start') router.push('/modals/grounding' as any);
+                  if (card.btn === 'Write') router.push('/(tabs)/journal');
+                }}
+              >
+                <Text style={styles.supportBtnText}>{card.btn}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
 
-        {/* SUPPORT OPTIONS */}
-        <View style={styles.optionsContainer}>
-          
-          {/* Option 1: Call */}
-          <TouchableOpacity style={styles.optionCard} onPress={handleCall} activeOpacity={0.8}>
-             <View style={styles.optionLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: '#EDF8F4' }]}>
-                   <Feather name="phone" size={18} color={Colors.secondary} />
-                </View>
-                <View style={styles.optionTextContainer}>
-                   <Text style={styles.optionTitle}>iCall India Helpline</Text>
-                   <Text style={styles.optionSub}>Professional counseling support</Text>
-                </View>
-             </View>
-             <View style={[styles.actionPill, { backgroundColor: Colors.secondary }]}>
-                <Text style={styles.actionPillText}>Call</Text>
-             </View>
-          </TouchableOpacity>
+        {/* Feeling Better */}
+        <TouchableOpacity onPress={() => router.back()} style={styles.feelingBetter}>
+          <Text style={styles.feelingBetterText}>I'm feeling better</Text>
+        </TouchableOpacity>
 
-          {/* Option 2: Grounding */}
-          <TouchableOpacity style={styles.optionCard} onPress={handleGrounding} activeOpacity={0.8}>
-             <View style={styles.optionLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: '#EBF2F9' }]}>
-                   <Feather name="anchor" size={18} color={Colors.primary} />
-                </View>
-                <View style={styles.optionTextContainer}>
-                   <Text style={styles.optionTitle}>5-4-3-2-1 Grounding</Text>
-                   <Text style={styles.optionSub}>A 2-minute exercise to feel present</Text>
-                </View>
-             </View>
-             <View style={[styles.actionPill, { backgroundColor: Colors.primary }]}>
-                <Text style={styles.actionPillText}>Start</Text>
-             </View>
-          </TouchableOpacity>
-
-          {/* Option 3: Journal */}
-          <TouchableOpacity style={styles.optionCard} onPress={handleJournal} activeOpacity={0.8}>
-             <View style={styles.optionLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: '#FBF0E6' }]}>
-                   <Feather name="edit-3" size={18} color={Colors.accent} />
-                </View>
-                <View style={styles.optionTextContainer}>
-                   <Text style={styles.optionTitle}>Emergency Journal</Text>
-                   <Text style={styles.optionSub}>Private, safe, unanalyzed</Text>
-                </View>
-             </View>
-             <View style={[styles.actionPill, { backgroundColor: Colors.accent }]}>
-                <Text style={styles.actionPillText}>Write</Text>
-             </View>
-          </TouchableOpacity>
-
+        {/* Disclaimer */}
+        <View style={styles.disclaimer}>
+          <Text style={styles.disclaimerText}>
+            Note: This is a safe space for support and does not replace professional medical advice. If you are in immediate physical danger, please contact local emergency services immediately.
+          </Text>
         </View>
-
-        <View style={styles.spacer} />
-
-        {/* FOOTER ACTIONS */}
-        <View style={styles.footer}>
-           <TouchableOpacity 
-             onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.back();
-             }}
-             style={styles.closeBtn}
-           >
-              <Text style={styles.closeBtnText}>I'm feeling better</Text>
-           </TouchableOpacity>
-           
-           <Text style={styles.disclaimer}>
-              INKsight does not provide medical advice.{"\n"}
-              In emergency, call 112 immediately.
-           </Text>
-        </View>
-
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F0F6FB',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
+  scroll: { paddingBottom: 40 },
+
   header: {
-    alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 24,
-    marginBottom: 40,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: 16,
   },
-  heartEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
+  headerTitle: {
+    fontFamily: 'Nunito_700Bold', fontSize: 18, color: Colors.safeTextDark, fontWeight: '700',
   },
-  title: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 26,
-    color: '#2C3E50',
-    marginBottom: 12,
-    textAlign: 'center',
+
+  hero: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 32, paddingBottom: 16 },
+  heroEmoji: { fontSize: 48, marginBottom: 24 },
+  heroTitle: { fontFamily: 'Nunito_700Bold', fontSize: 26, color: Colors.safeTextDark, textAlign: 'center', marginBottom: 8 },
+  heroDesc: {
+    fontFamily: 'Lora_400Regular_Italic', fontSize: 16, color: Colors.safeTextMuted,
+    textAlign: 'center', maxWidth: 320, lineHeight: 26,
   },
-  subtitle: {
-    fontFamily: 'Lora_400Regular',
-    fontSize: 16,
-    color: '#5B7A96',
-    textAlign: 'center',
-    lineHeight: 28,
-    maxWidth: 280,
+
+  breathCard: {
+    marginHorizontal: 16, marginTop: 24, padding: 24,
+    backgroundColor: '#FFFFFF99', borderRadius: 20,
+    borderWidth: 1, borderColor: '#FFFFFF66',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } as any : {}),
+    alignItems: 'center', gap: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8,
   },
-  breathingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 28,
-    marginHorizontal: 24,
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 15,
-    elevation: 3,
+  breathCircleContainer: { width: 128, height: 128, alignItems: 'center', justifyContent: 'center' },
+  breathCircle: {
+    width: 112, height: 112, borderRadius: 56,
+    backgroundColor: Colors.safeTeal, opacity: 0.8,
+    alignItems: 'center', justifyContent: 'center',
   },
-  breathingCenter: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  breathCircleText: { fontFamily: 'Inter_500Medium', fontSize: 16, color: '#FFFFFF', fontWeight: '500' },
+  breathTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: Colors.safeTextDark, fontWeight: '700' },
+  breathPhase: { fontFamily: 'Lora_400Regular_Italic', fontSize: 18, color: Colors.safeTeal },
+  startBtn: {
+    backgroundColor: Colors.safeTeal, paddingHorizontal: 40, paddingVertical: 12,
+    borderRadius: 16,
+    shadowColor: Colors.safeTeal, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
   },
-  circleContainer: {
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+  startBtnText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: '#FFFFFF', fontWeight: '700' },
+
+  supportSection: { paddingHorizontal: 16, marginTop: 32, gap: 12 },
+  supportLabel: {
+    fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.safeTextDark,
+    letterSpacing: 1, marginBottom: 4, paddingHorizontal: 4, fontWeight: '700',
   },
-  breathingText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: '#A0ADB8',
-    textAlign: 'center',
+  supportCard: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF', padding: 16, borderRadius: 16,
+    borderWidth: 1, borderColor: '#F1F5F9',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,
   },
-  breathingTextActive: {
-    fontFamily: 'Lora_400Regular',
-    fontSize: 18,
-    color: Colors.primary,
+  supportCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 16, flex: 1 },
+  supportIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  supportTitle: { fontFamily: 'Inter_700Bold', fontSize: 15, color: Colors.safeTextDark, fontWeight: '700' },
+  supportDesc: { fontFamily: 'Inter_400Regular', fontSize: 12, color: Colors.safeTextMuted, marginTop: 2 },
+  supportBtn: {
+    paddingHorizontal: 20, paddingVertical: 8, borderRadius: 8,
   },
-  optionsContainer: {
-    paddingHorizontal: 24,
+  supportBtnText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: '#FFFFFF', fontWeight: '700' },
+
+  feelingBetter: { alignItems: 'center', marginTop: 32 },
+  feelingBetterText: {
+    fontFamily: 'Inter_700Bold', fontSize: 16, color: Colors.accent,
+    textDecorationLine: 'underline', fontWeight: '700',
   },
-  optionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  optionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingRight: 10,
-  },
-  iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 15,
-    color: '#2C3E50',
-    marginBottom: 4,
-  },
-  optionSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#7F8C8D',
-  },
-  actionPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  actionPillText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-  spacer: {
-    flex: 1,
-  },
-  footer: {
-    alignItems: 'center',
-    marginTop: 40,
-    paddingHorizontal: 24,
-  },
-  closeBtn: {
-    padding: 12,
-    marginBottom: 20,
-  },
-  closeBtnText: {
-    fontFamily: 'Nunito_400Regular',
-    fontSize: 15,
-    color: '#7F8C8D',
-  },
+
   disclaimer: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: '#A0ADB8',
-    textAlign: 'center',
-    lineHeight: 16,
+    marginHorizontal: 24, marginTop: 24, padding: 16,
+    backgroundColor: '#FFFFFF4D', borderRadius: 12,
+  },
+  disclaimerText: {
+    fontFamily: 'Inter_400Regular', fontSize: 11, color: Colors.safeTextMuted,
+    textTransform: 'uppercase', lineHeight: 18, letterSpacing: -0.3,
   },
 });

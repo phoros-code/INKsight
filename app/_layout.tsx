@@ -3,6 +3,7 @@ import { View, Platform } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors } from '../src/constants/colors';
+import { ThemeProvider } from '../src/constants/ThemeContext';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -25,8 +26,6 @@ import {
   Inter_600SemiBold,
   Inter_700Bold
 } from '@expo-google-fonts/inter';
-
-import { seedWebDemoData } from '../src/utils/seedDemoData';
 
 // Only import native modules on native platforms
 let SQLiteProvider: any = null;
@@ -61,12 +60,7 @@ export default function RootLayout() {
     Inter: Inter_400Regular,
   });
 
-  // Auto-seed demo data on web first load
-  useEffect(() => {
-    if (Platform.OS === 'web') {
-      seedWebDemoData();
-    }
-  }, []);
+  // Demo data is loaded manually from Settings > Load Demo Data (Dev)
 
   const [isReady, setIsReady] = useState(false);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(false);
@@ -163,22 +157,26 @@ export default function RootLayout() {
   // On web, skip SQLiteProvider (it crashes)
   if (Platform.OS === 'web') {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
-          {content}
-        </SafeAreaProvider>
-      </GestureHandlerRootView>
+      <ThemeProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            {content}
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </ThemeProvider>
     );
   }
 
   // Native: wrap with SQLiteProvider
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <SQLiteProvider databaseName="inksight.db" onInit={initDatabase}>
-          {content}
-        </SQLiteProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <SQLiteProvider databaseName="inksight.db" onInit={initDatabase}>
+            {content}
+          </SQLiteProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ThemeProvider>
   );
 }

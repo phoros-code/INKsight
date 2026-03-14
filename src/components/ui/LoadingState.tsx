@@ -36,6 +36,6 @@ const styles = StyleSheet.create({
   text: {
     fontFamily: 'Lora_400Regular_Italic',
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
   }
 });

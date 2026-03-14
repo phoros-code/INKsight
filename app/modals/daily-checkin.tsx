@@ -1,355 +1,183 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useDatabase } from '../../src/utils/webSafe';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-import { Feather } from '@expo/vector-icons';
-import { format } from 'date-fns';
-
 import { Colors } from '../../src/constants/colors';
-import { CheckIn } from '../../src/types';
-import { insertCheckin, getCheckinByDate } from '../../src/database/checkinDB';
+import { MaterialIcons } from '@expo/vector-icons';
+import { webStore } from '../../src/database/webDataStore';
 
-// Energy levels per Stitch reference — battery-style icons
 const ENERGY_LEVELS = [
-  { label: 'Drained', icon: '🪫', value: 1 },
-  { label: 'Low', icon: '🔋', value: 2 },
-  { label: 'Steady', icon: '🔋', value: 3 },
-  { label: 'Brisk', icon: '🔋', value: 4 },
-  { label: 'Radiant', icon: '⚡', value: 5 },
+  { label: 'Drained', icon: 'battery-alert' as const, color: '#94A3B8', bg: '#E2E8F0' },
+  { label: 'Low', icon: 'battery-2-bar' as const, color: '#FB923C', bg: '#FFF7ED' },
+  { label: 'Steady', icon: 'battery-5-bar' as const, color: Colors.primary, bg: Colors.primary + '33' },
+  { label: 'Brisk', icon: 'battery-full' as const, color: Colors.sage, bg: Colors.sage + '15' },
+  { label: 'Radiant', icon: 'bolt' as const, color: '#CA8A04', bg: '#FEF9C3' },
 ];
 
-// Focus areas per Stitch reference
-const FOCUS_OPTIONS = [
-  'Mindfulness',
-  'Creativity',
-  'Physical Health',
-  'Work-Life',
-];
+const FOCUS_OPTIONS = ['Mindfulness', 'Creativity', 'Physical Health', 'Work-Life'];
 
 export default function DailyCheckinModal() {
   const router = useRouter();
-  const db = useDatabase();
+  const [energy, setEnergy] = useState(2); // index
+  const [focus, setFocus] = useState('Creativity');
+  const [note, setNote] = useState('');
+  const [saved, setSaved] = useState(false);
 
-  const [energy, setEnergy] = useState<number>(3);
-  const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
-  const [quickNote, setQuickNote] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
-
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-
-  useEffect(() => {
-    const loadCheckin = async () => {
-      try {
-        const existing = await getCheckinByDate(db, todayStr);
-        if (existing) {
-          setIsUpdating(true);
-          if (existing.energyLevel) setEnergy(existing.energyLevel);
-          if (existing.oneWord) setQuickNote(existing.oneWord);
-        }
-      } catch (e) {
-        console.error('Error loading checkin', e);
-      }
-    };
-    loadCheckin();
-  }, []);
-
-  const handleEnergySelect = (value: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setEnergy(value);
-  };
-
-  const toggleFocus = (focus: string) => {
-    Haptics.selectionAsync();
-    setSelectedFocus(prev =>
-      prev.includes(focus) ? prev.filter(f => f !== focus) : [...prev, focus]
-    );
-  };
-
-  const handleSave = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    try {
-      const data: Partial<CheckIn> = {
-        date: todayStr,
-        energyLevel: energy,
-        oneWord: quickNote.trim(),
-        // Store focus as part of social connection field or extend schema
-        socialConnection: selectedFocus.join(',') as any,
-      };
-
-      await insertCheckin(db, data);
-      router.back();
-    } catch (e) {
-      console.error('Save error', e);
+  const handleSave = () => {
+    if (Platform.OS === 'web') {
+      webStore.insertCheckIn({
+        date: new Date().toISOString().split('T')[0],
+        sleep_quality: energy + 1,
+        energy_level: energy + 1,
+        focus,
+        quick_note: note,
+        created_at: new Date().toISOString(),
+      });
     }
-  };
-
-  const handleClose = () => {
-    router.back();
+    setSaved(true);
+    setTimeout(() => router.back(), 1000);
   };
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-          <Feather name="x" size={24} color={Colors.textSecondary} />
+        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
+          <MaterialIcons name="close" size={24} color={Colors.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Daily Check-In</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* MAIN HEADING */}
-        <Text style={styles.heading}>How are you feeling today?</Text>
-        <Text style={styles.subtitle}>Step into your INKsight journey.</Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Question */}
+        <View style={styles.questionSection}>
+          <Text style={styles.questionTitle}>How are you feeling today?</Text>
+          <Text style={styles.questionSub}>Step into your INKsight journey.</Text>
+        </View>
 
-        {/* ENERGY LEVEL SECTION */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionLabel}>ENERGY LEVEL</Text>
+        {/* Energy Level */}
+        <View style={styles.glassCard}>
+          <Text style={styles.cardLabel}>ENERGY LEVEL</Text>
           <View style={styles.energyRow}>
-            {ENERGY_LEVELS.map((level) => {
-              const isSelected = energy === level.value;
+            {ENERGY_LEVELS.map((e, i) => {
+              const isActive = i === energy;
               return (
-                <TouchableOpacity
-                  key={level.value}
-                  activeOpacity={0.7}
-                  onPress={() => handleEnergySelect(level.value)}
-                  style={styles.energyItem}
-                >
+                <TouchableOpacity key={i} style={styles.energyItem} onPress={() => setEnergy(i)}>
                   <View style={[
-                    styles.energyIconCircle,
-                    isSelected && styles.energyIconCircleSelected,
-                    isSelected && { borderColor: Colors.primary }
+                    styles.energyCircle,
+                    { backgroundColor: e.bg },
+                    isActive && { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: e.color },
                   ]}>
-                    <Text style={styles.energyIcon}>{level.icon}</Text>
+                    <MaterialIcons name={e.icon} size={isActive ? 32 : 28} color={e.color} />
                   </View>
                   <Text style={[
                     styles.energyLabel,
-                    isSelected && styles.energyLabelSelected
-                  ]}>
-                    {level.label}
-                  </Text>
+                    isActive && { color: e.color, fontWeight: '700', fontSize: 13 },
+                  ]}>{e.label}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        {/* TODAY'S FOCUS SECTION */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionLabel}>TODAY'S FOCUS</Text>
-          <View style={styles.focusGrid}>
-            {FOCUS_OPTIONS.map((focus) => {
-              const isSelected = selectedFocus.includes(focus);
-              return (
-                <TouchableOpacity
-                  key={focus}
-                  activeOpacity={0.7}
-                  onPress={() => toggleFocus(focus)}
-                  style={[
-                    styles.focusPill,
-                    isSelected && styles.focusPillSelected
-                  ]}
-                >
-                  <Text style={[
-                    styles.focusPillText,
-                    isSelected && styles.focusPillTextSelected
-                  ]}>
-                    {focus}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+        {/* Focus Section */}
+        <View style={styles.glassCard}>
+          <Text style={styles.cardLabel}>TODAY'S FOCUS</Text>
+          <View style={styles.focusRow}>
+            {FOCUS_OPTIONS.map(f => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.focusChip, focus === f && styles.focusChipActive]}
+                onPress={() => setFocus(f)}
+              >
+                <Text style={[styles.focusChipText, focus === f && styles.focusChipTextActive]}>{f}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
-        {/* QUICK NOTE SECTION */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionLabel}>QUICK NOTE</Text>
+        {/* Notes */}
+        <View style={styles.glassCard}>
+          <Text style={styles.cardLabel}>QUICK NOTE</Text>
           <TextInput
             style={styles.noteInput}
             placeholder="What's on your mind?"
-            placeholderTextColor="#A0ADB8"
-            value={quickNote}
-            onChangeText={setQuickNote}
+            placeholderTextColor={Colors.textDark + '66'}
             multiline
-            textAlignVertical="top"
+            value={note}
+            onChangeText={setNote}
           />
         </View>
-      </ScrollView>
 
-      {/* BOTTOM CTA */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-          <Text style={styles.saveBtnText}>
-            {isUpdating ? 'Update Check-In' : 'Save Check-In'}
-          </Text>
+        {/* Save Button */}
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.9}>
+          <Text style={styles.saveBtnText}>{saved ? '✓ Saved!' : 'Save Check-In'}</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  container: { flex: 1, backgroundColor: Colors.background, maxWidth: 448, alignSelf: 'center', width: '100%' },
   header: {
-    paddingTop: 56,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    padding: 24,
   },
   closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F0EDE8',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#FFFFFF80', alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 17,
-    color: Colors.textPrimary,
+  headerTitle: { fontFamily: 'Nunito_700Bold', fontSize: 18, color: Colors.textDark, fontWeight: '700' },
+
+  scroll: { paddingHorizontal: 24, paddingBottom: 120, gap: 32 },
+
+  questionSection: { alignItems: 'center', gap: 8 },
+  questionTitle: { fontFamily: 'Nunito_700Bold', fontSize: 28, color: Colors.textDark, fontWeight: '700', textAlign: 'center' },
+  questionSub: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.primary, fontWeight: '500' },
+
+  glassCard: {
+    backgroundColor: '#FFFFFF66', borderRadius: 20, padding: 24,
+    borderWidth: 1, borderColor: '#FFFFFF4D',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } as any : {}),
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8,
   },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 120,
+  cardLabel: {
+    fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.textDark + '99',
+    letterSpacing: 1.5, textAlign: 'center', marginBottom: 24, fontWeight: '700',
   },
-  heading: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 26,
-    color: Colors.textPrimary,
-    marginBottom: 8,
-    marginTop: 16,
+
+  energyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: 8 },
+  energyItem: { alignItems: 'center', gap: 12 },
+  energyCircle: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
   },
-  subtitle: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 15,
-    color: Colors.primary,
-    marginBottom: 32,
+  energyLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: Colors.textDark, fontWeight: '600' },
+
+  focusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  focusChip: {
+    paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: Colors.primary + '33',
   },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
+  focusChipActive: {
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4,
   },
-  sectionLabel: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 11,
-    color: '#A0ADB8',
-    letterSpacing: 1.5,
-    marginBottom: 16,
-  },
-  energyRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  energyItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  energyIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#F5F2EE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  energyIconCircleSelected: {
-    backgroundColor: '#EBF2F9',
-    borderWidth: 2,
-  },
-  energyIcon: {
-    fontSize: 22,
-  },
-  energyLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: '#A0ADB8',
-    textAlign: 'center',
-  },
-  energyLabelSelected: {
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.primary,
-  },
-  focusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  focusPill: {
-    backgroundColor: '#F0EDE8',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E0DAD3',
-  },
-  focusPillSelected: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  focusPillText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  focusPillTextSelected: {
-    color: '#FFFFFF',
-  },
+  focusChipText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textDark, fontWeight: '500' },
+  focusChipTextActive: { color: '#FFFFFF' },
+
   noteInput: {
-    backgroundColor: '#F8F6F3',
-    borderRadius: 14,
-    padding: 16,
-    minHeight: 100,
-    fontFamily: 'Lora_400Regular',
-    fontSize: 15,
-    color: Colors.textPrimary,
-    lineHeight: 24,
+    backgroundColor: '#FFFFFF80', borderRadius: 12, padding: 16,
+    minHeight: 100, fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.textDark,
+    textAlignVertical: 'top',
   },
-  bottomActions: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 24,
-    paddingBottom: 34,
-    paddingTop: 12,
-    backgroundColor: Colors.background,
-  },
+
   saveBtn: {
-    backgroundColor: '#2C3E50',
-    width: '100%',
-    height: 56,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: '100%', paddingVertical: 16, borderRadius: 28,
+    backgroundColor: Colors.textDark, alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12,
   },
-  saveBtnText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 16,
-    color: '#FFFFFF',
-  },
+  saveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', fontWeight: '700' },
 });

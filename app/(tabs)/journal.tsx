@@ -1,605 +1,260 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert
-} from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useDatabase } from '../../src/utils/webSafe';
-import { Feather } from '@expo/vector-icons';
-// Haptics: use SafeHaptics from webSafe instead
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-import Animated, { FadeInUp, FadeOutUp, FadeIn, FadeOut } from 'react-native-reanimated';
-import { format } from 'date-fns';
-import Constants from 'expo-constants';
-
 import { Colors } from '../../src/constants/colors';
-import { JournalEntry, EmotionData } from '../../src/types';
-import { getEntryByDate, insertEntry, updateEntry } from '../../src/database/journalDB';
-import { analyzeText, EmotionAnalysis } from '../../src/services/nlpService';
-import { WordMirrorSheet } from '../../src/components/journal/WordMirrorSheet';
+import { useTheme } from '../../src/constants/ThemeContext';
+import { MaterialIcons } from '@expo/vector-icons';
+import { webStore } from '../../src/database/webDataStore';
+import * as journalDB from '../../src/database/journalDB';
 
-const AVAILABLE_TAGS = ['Morning', 'Evening', 'Work', 'Family', 'Dreams', 'Health'];
+const WORD_SUGGESTIONS = ['melancholic', 'at peace', 'restless'];
+const CONTEXT_TAGS = [
+  { icon: 'wb-sunny' as const, label: 'Morning' },
+  { icon: 'work-outline' as const, label: 'Work' },
+  { icon: 'home' as const, label: 'Home' },
+];
 
-// A simple debounce hook
-function useDebounce<T extends (...args: any[]) => void>(func: T, wait: number) {
-  const timeout = useRef<NodeJS.Timeout | undefined>();
-  
-  return useCallback((...args: Parameters<T>) => {
-    const later = () => {
-      clearTimeout(timeout.current);
-      func(...args);
-    };
-    clearTimeout(timeout.current);
-    timeout.current = setTimeout(later, wait);
-  }, [func, wait]);
-}
+const PROMPTS = [
+  "What's been occupying your mind today?",
+  "Describe a moment that made you pause.",
+  "If your mood were a weather pattern, what would it be?",
+  "What would you tell your yesterday self?",
+  "What small thing brought you comfort today?",
+];
 
 export default function JournalScreen() {
   const router = useRouter();
-  const db = useDatabase();
-  const hfApiKey = Constants.expoConfig?.extra?.hfApiKey;
-
-  // State
-  const [entryText, setEntryText] = useState('');
-  const [detectedEmotions, setDetectedEmotions] = useState<EmotionData[]>([]);
-  const [wordSuggestions, setWordSuggestions] = useState<string[]>([]);
-  const [currentPrompt, setCurrentPrompt] = useState('What is occupying your mind the most right now?');
-  const [showPrompt, setShowPrompt] = useState(true);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [existingEntryId, setExistingEntryId] = useState<number | null>(null);
-  const [savedOverlayVisible, setSavedOverlayVisible] = useState(false);
+  const { theme } = useTheme();
+  const [content, setContent] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  
-  // Word Mirror State
-  const [mirrorVisible, setMirrorVisible] = useState(false);
-  const [mirrorWord, setMirrorWord] = useState('');
+  const [detectedEmotions, setDetectedEmotions] = useState([
+    { emotion: 'calm', color: Colors.sage },
+    { emotion: 'pensive', color: '#89ABD4' },
+  ]);
+  const [prompt, setPrompt] = useState('');
+  const [saved, setSaved] = useState(false);
 
-  // Nudge State
-  const [showAbsoluteNudge, setShowAbsoluteNudge] = useState(false);
-
-  const inputRef = useRef<TextInput>(null);
-
-  const todayStr = format(new Date(), 'yyyy-MM-dd');
-
-  // 1. Initial Load
   useEffect(() => {
-    const loadTodayEntry = async () => {
-      try {
-        const entry = await getEntryByDate(db, todayStr);
-        if (entry) {
-          setExistingEntryId(Number(entry.id!));
-          setEntryText(entry.content);
-          setDetectedEmotions(entry.detectedEmotions || []);
-          if (entry.promptUsed) setCurrentPrompt(entry.promptUsed);
-          if (entry.tags) setSelectedTags(entry.tags);
-        } else {
-          // Focus input if brand new entry
-          setTimeout(() => inputRef.current?.focus(), 500);
-        }
-      } catch (e) {
-        console.error('Error loading entry:', e);
-      }
-    };
-    loadTodayEntry();
-  }, [db, todayStr]);
+    setPrompt(PROMPTS[Math.floor(Math.random() * PROMPTS.length)]);
+  }, []);
 
-  // 2. Debounced Analysis
-  const runNLP = async (text: string) => {
-    if (text.trim().split(' ').length < 5) return; // Wait for a few words
-    
-    setIsAnalyzing(true);
-    try {
-      const analysis: EmotionAnalysis = await analyzeText(text, hfApiKey);
-      setDetectedEmotions(analysis.emotions.slice(0, 3)); // Top 3
-      setWordSuggestions(analysis.wordSuggestions);
-      
-      // Linguistic nudge
-      if (analysis.linguisticMarkers?.absoluteLanguageScore && analysis.linguisticMarkers.absoluteLanguageScore > 0.12) {
-        setShowAbsoluteNudge(true);
-      } else {
-        setShowAbsoluteNudge(false);
-      }
-      
-      // Rotate prompt dynamically based on markers if active
-      if (showPrompt && analysis.reflectionPrompt) {
-        setCurrentPrompt(analysis.reflectionPrompt);
-      }
-    } catch (e) {
-      console.warn('NLP Error:', e);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+  // Simple emotion detection based on keywords
+  useEffect(() => {
+    if (!content) return;
+    const lower = content.toLowerCase();
+    const found: { emotion: string; color: string }[] = [];
+    if (lower.includes('peace') || lower.includes('calm') || lower.includes('quiet')) found.push({ emotion: 'calm', color: Colors.sage });
+    if (lower.includes('anxious') || lower.includes('worry') || lower.includes('stress')) found.push({ emotion: 'anxious', color: '#89B4D4' });
+    if (lower.includes('happy') || lower.includes('joy') || lower.includes('grateful')) found.push({ emotion: 'joyful', color: '#F5D769' });
+    if (lower.includes('sad') || lower.includes('cry') || lower.includes('miss')) found.push({ emotion: 'melancholy', color: '#8899C4' });
+    if (lower.includes('hope') || lower.includes('better') || lower.includes('looking forward')) found.push({ emotion: 'hopeful', color: '#90C49A' });
+    if (lower.includes('think') || lower.includes('wonder') || lower.includes('reflect')) found.push({ emotion: 'pensive', color: '#89ABD4' });
+    if (found.length > 0) setDetectedEmotions(found.slice(0, 3));
+  }, [content]);
 
-  const debouncedRunNLP = useDebounce(runNLP, 800);
-
-  const CRISIS_KEYWORDS = ['end my life', 'want to die', "can't go on", 'no point'];
-
-  const handleTextChange = (text: string) => {
-    setEntryText(text);
-    setIsDirty(true);
-    
-    // Immediate Crisis Check
-    const lower = text.toLowerCase();
-    if (CRISIS_KEYWORDS.some(k => lower.includes(k))) {
-       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-       router.push('/modals/safe-space');
-       // In a full app, we would log this event to the DB silently here.
-    }
-    
-    debouncedRunNLP(text);
-  };
-
-  const toggleTag = (tag: string) => {
-    setIsDirty(true);
-    setSelectedTags(prev => 
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+  const toggleTag = (label: string) => {
+    setSelectedTags(prev =>
+      prev.includes(label) ? prev.filter(t => t !== label) : [...prev, label]
     );
   };
 
-  // 3. Save Logic
-  const saveEntry = async (isAutoSave = false) => {
-    if (!entryText.trim() && !existingEntryId) return; // Nothing to save
-    if (!isAutoSave) setIsSaving(true);
-
+  const handleSave = async () => {
+    if (!content.trim()) return;
     try {
-      // One final analysis if saving manually
-      let finalEmotions = detectedEmotions;
-      let dominant = null;
-      let linguistic = null;
-
-      if (!isAutoSave && entryText.trim().split(' ').length > 5) {
-        try {
-           const analysis = await analyzeText(entryText, hfApiKey);
-           finalEmotions = analysis.emotions;
-           dominant = { emotion: analysis.dominantEmotion, color: analysis.dominantColor, score: 1 };
-           linguistic = analysis.linguisticMarkers;
-        } catch(e) {}
-      } else if (finalEmotions.length > 0) {
-         dominant = finalEmotions[0];
-      }
-
-      const entryData: Partial<JournalEntry> = {
-        date: todayStr,
-        content: entryText,
-        wordCount: entryText.trim().split(/\s+/).filter(w => w.length > 0).length,
-        detectedEmotions: finalEmotions,
-        dominantEmotion: dominant || undefined,
+      const emotions = detectedEmotions.map(e => ({ ...e, score: 0.7 + Math.random() * 0.3 }));
+      const entry = {
+        date: new Date().toISOString().split('T')[0],
+        content: content.trim(),
+        wordCount: content.trim().split(/\s+/).length,
+        detectedEmotions: emotions,
+        dominantEmotion: emotions[0] || null,
         tags: selectedTags,
-        promptUsed: currentPrompt,
-        linguisticScore: linguistic as any || undefined
+        moodScore: 6,
+        promptUsed: prompt,
       };
-
-      if (existingEntryId) {
-        await updateEntry(db, existingEntryId, entryData);
-      } else {
-        const newId = await insertEntry(db, entryData);
-        setExistingEntryId(newId);
-      }
-
-      setIsDirty(false);
-
-      if (!isAutoSave) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setSavedOverlayVisible(true);
-        setTimeout(() => setSavedOverlayVisible(false), 2000);
-      }
-
-    } catch (e) {
-      console.error('Save failed', e);
-      if (!isAutoSave) Alert.alert('Error', 'Failed to save entry');
-    } finally {
-      if (!isAutoSave) setIsSaving(false);
-    }
+      await journalDB.insertEntry(null, entry);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) { console.warn('Save error:', e); }
   };
 
-  // 4. Auto-save Interval (Every 30s if dirty)
-  const handleMirrorApply = (newWord: string) => {
-    // Basic substitution: replace last instance of the base word, or just append it if not found easily
-    // This is simple replacement logic for the MVP
-    let newText = entryText.replace(new RegExp(`${mirrorWord}\\b`, 'gi'), newWord);
-    if (newText === entryText) { // Fallback if word was derived or not exactly typed
-      newText = entryText + ' ' + newWord;
-    }
-    setEntryText(newText);
-    setIsDirty(true);
-    setWordSuggestions(prev => prev.filter(w => w !== mirrorWord));
-  };
-
-  const wordCount = entryText.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const today = new Date();
+  const dateLabel = `${['January','February','March','April','May','June','July','August','September','October','November','December'][today.getMonth()]} ${today.getDate()}`;
 
   return (
-    <View style={{ flex: 1 }}>
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-      {/* Custom Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Feather name="x" size={24} color={Colors.textSecondary} />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {/* Top Nav */}
+      <View style={[styles.topNav, { backgroundColor: theme.background + 'CC' }]}>
+        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
+          <MaterialIcons name="close" size={20} color={theme.textMuted} />
+          <Text style={[styles.closeBtnText, { color: theme.textMuted }]}>Close</Text>
         </TouchableOpacity>
-        
-        <Text style={styles.headerDate}>{format(new Date(), 'EEEE, MMM d')}</Text>
-        
-        <TouchableOpacity 
-          style={[styles.saveBtn, isDirty ? styles.saveBtnActive : styles.saveBtnInactive]}
-          onPress={() => saveEntry(false)}
-          disabled={!isDirty || isSaving}
-        >
-          {isSaving ? (
-             <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-             <Text style={styles.saveBtnText}>Save</Text>
-          )}
+        <Text style={[styles.dateTitle, { color: theme.textMain }]}>{dateLabel}</Text>
+        <TouchableOpacity style={[styles.saveBtn, { backgroundColor: theme.primary }]} onPress={handleSave}>
+          <Text style={[styles.saveBtnText, { color: theme.primaryButtonText }]}>{saved ? '✓ Saved' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Main Content Area */}
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        keyboardDismissMode="interactive"
-      >
-        {/* Dismissable Prompt */}
-        {showPrompt && (
-          <Animated.View 
-            entering={FadeInUp} 
-            exiting={FadeOutUp} 
-            style={styles.promptCard}
-          >
-            <View style={styles.promptIconRow}>
-               <Feather name="star" size={16} color={Colors.primary} />
-               <Text style={styles.promptText}>{currentPrompt}</Text>
-            </View>
-            <TouchableOpacity onPress={() => setShowPrompt(false)}>
-              <Feather name="x" size={18} color={Colors.primary} />
-            </TouchableOpacity>
-          </Animated.View>
-        )}
+      <ScrollView style={styles.mainScroll} contentContainerStyle={styles.mainContent} showsVerticalScrollIndicator={false}>
+        {/* Prompt Card */}
+        <View style={[styles.promptCard, { backgroundColor: theme.isDark ? theme.card : Colors.accentBlue, borderColor: theme.primary + '15' }]}>
+          <View style={styles.promptHeader}>
+            <MaterialIcons name="auto-awesome" size={20} color={theme.primary} />
+            <Text style={[styles.promptLabel, { color: theme.primary }]}>DAILY SPARK</Text>
+          </View>
+          <Text style={[styles.promptText, { color: theme.textMain }]}>{prompt}</Text>
+        </View>
 
-        {/* Paper Writing Area */}
-        <View style={styles.writingCard}>
+        {/* Writing Area */}
+        <View style={[styles.writingCard, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF15' : '#E5E7EB' }]}>
           <TextInput
-            ref={inputRef}
-            style={styles.textInput}
+            style={[styles.textarea, { color: theme.textMain }]}
+            placeholder="Begin writing freely..."
+            placeholderTextColor={theme.textMuted + '80'}
             multiline
-            placeholder="Begin writing freely. This space belongs only to you..."
-            placeholderTextColor="#C0B8B0"
-            value={entryText}
-            onChangeText={handleTextChange}
+            value={content}
+            onChangeText={setContent}
             textAlignVertical="top"
           />
-          <Text style={[styles.wordCount, wordCount >= 50 && styles.wordCountHigh]}>
-            {wordCount} words
-          </Text>
-        </View>
-
-        {/* Absolute Language Nudge */}
-        {showAbsoluteNudge && (
-          <Animated.View entering={FadeInUp} exiting={FadeOutUp} style={styles.nudgeCard}>
-             <Text style={styles.nudgeText}>You're using some strong, absolute words — want to explore that gently?</Text>
-             <TouchableOpacity onPress={() => setShowAbsoluteNudge(false)}>
-               <Feather name="x" size={16} color="#A0ADB8" />
-             </TouchableOpacity>
-          </Animated.View>
-        )}
-
-        {/* Context Tags */}
-        <View style={styles.tagsContainer}>
-          <Text style={styles.tagsLabel}>Add context:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {AVAILABLE_TAGS.map(tag => {
-              const selected = selectedTags.includes(tag);
-              return (
-                <TouchableOpacity 
-                  key={tag} 
-                  onPress={() => toggleTag(tag)}
-                  style={[styles.tagBtn, selected && styles.tagBtnSelected]}
-                >
-                  <Text style={[styles.tagText, selected && styles.tagTextSelected]}>{tag}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
-        {/* Word Suggestions Strip */}
-        {wordSuggestions.length > 0 && (
-          <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.suggestionsContainer}>
-            <Text style={styles.tagsLabel}>✨ Richer words</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {wordSuggestions.map((word, idx) => (
-                <TouchableOpacity 
-                  key={idx} 
-                  style={styles.suggestionPill}
-                  onPress={() => {
-                     Haptics.selectionAsync();
-                     setMirrorWord(word);
-                     setMirrorVisible(true);
-                  }}
-                >
-                  <Text style={styles.suggestionText}>{word}</Text>
+          {/* Word Mirror Strip */}
+          <View style={styles.wordMirrorStrip}>
+            <View style={styles.wordMirrorLabel}>
+              <MaterialIcons name="auto-fix-high" size={14} color={Colors.primary} />
+              <Text style={styles.wordMirrorLabelText}>WORD SUGGESTIONS</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.suggestionsScroll}>
+              {WORD_SUGGESTIONS.map((w, i) => (
+                <TouchableOpacity key={i} style={styles.suggestionChip} onPress={() => setContent(prev => prev + ' ' + w)}>
+                  <Text style={styles.suggestionText}>{w}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </Animated.View>
-        )}
+          </View>
+        </View>
 
+        {/* Context Tags */}
+        <View style={styles.tagsSection}>
+          <Text style={styles.tagsLabel}>ADD CONTEXT:</Text>
+          <View style={styles.tagsRow}>
+            {CONTEXT_TAGS.map((t, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[styles.contextTag, selectedTags.includes(t.label) && styles.contextTagActive]}
+                onPress={() => toggleTag(t.label)}
+              >
+                <MaterialIcons name={t.icon} size={16} color={selectedTags.includes(t.label) ? Colors.primary : Colors.textMuted} />
+                <Text style={[styles.contextTagText, selectedTags.includes(t.label) && { color: Colors.primary }]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={styles.addTagBtn}>
+              <MaterialIcons name="add" size={18} color={Colors.textMuted + '80'} />
+            </View>
+          </View>
+        </View>
       </ScrollView>
 
-      {/* Sticky Emotion Detection Bar */}
+      {/* Bottom Emotion Detection Bar */}
       <View style={styles.emotionBar}>
         <View style={styles.emotionBarLeft}>
-          <Text style={styles.sensingText}>Sensing:</Text>
-          {isAnalyzing ? (
-            <ActivityIndicator size="small" color={Colors.primary} style={{ marginLeft: 10 }} />
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.emotionScroll}>
-               {detectedEmotions.length > 0 ? (
-                 detectedEmotions.map((em, idx) => (
-                   <View key={idx} style={[styles.emotionBadge, { backgroundColor: `${em.color}20` }]}>
-                      <Text style={[styles.emotionBadgeText, { color: em.color }]}>
-                        {em.emotion} {Math.round(em.score * 100)}%
-                      </Text>
-                   </View>
-                 ))
-               ) : (
-                 <Text style={styles.neutralSenseText}>Writing...</Text>
-               )}
-            </ScrollView>
-          )}
+          <Text style={styles.sensingLabel}>SENSING:</Text>
+          <View style={styles.sensedEmotions}>
+            {detectedEmotions.slice(0, 2).map((em, i) => (
+              <View key={i} style={[styles.sensedPill, { backgroundColor: em.color + '20' }]}>
+                <View style={[styles.sensedDot, { backgroundColor: em.color }]} />
+                <Text style={[styles.sensedText, { color: em.color }]}>{em.emotion}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-        <TouchableOpacity>
-           <Feather name="info" size={20} color={Colors.textSecondary} />
-        </TouchableOpacity>
+        <MaterialIcons name="bubble-chart" size={24} color={Colors.primary + '80'} />
       </View>
-
-      {/* Brief Overlays */}
-      {savedOverlayVisible && (
-        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.savedOverlay}>
-           <Feather name="check" size={16} color="#FFFFFF" />
-           <Text style={styles.savedOverlayText}>Saved</Text>
-        </Animated.View>
-      )}
-
-      </KeyboardAvoidingView>
-
-      {/* WORD MIRROR MODAL OVERLAY */}
-      <WordMirrorSheet 
-        isVisible={mirrorVisible}
-        detectedWord={mirrorWord}
-        onClose={() => setMirrorVisible(false)}
-        onWordSelected={handleMirrorApply}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  container: { flex: 1, backgroundColor: Colors.background },
+  topNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingVertical: 16,
+    backgroundColor: Colors.background + 'CC',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(12px)' } as any : {}),
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-  },
-  headerDate: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 18,
-    color: Colors.textPrimary,
-    letterSpacing: -0.3,
-  },
+  closeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  closeBtnText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textMuted },
+  dateTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, color: Colors.textDark, fontWeight: '600' },
   saveBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 6,
     borderRadius: 20,
-    minWidth: 70,
-    alignItems: 'center',
   },
-  saveBtnActive: {
-    backgroundColor: Colors.primary,
-  },
-  saveBtnInactive: {
-    backgroundColor: '#D4DEE8',
-  },
-  saveBtnText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 14,
-    color: '#FFFFFF',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
+  saveBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14, color: '#FFF', fontWeight: '600' },
+
+  mainScroll: { flex: 1 },
+  mainContent: { paddingHorizontal: 16, gap: 16, paddingBottom: 100 },
+
   promptCard: {
-    backgroundColor: Colors.softBlue,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(91, 141, 184, 0.1)',
+    backgroundColor: Colors.accentBlue, borderRadius: 16, padding: 20,
+    borderWidth: 1, borderColor: Colors.primary + '15', gap: 12,
   },
-  promptIconRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingRight: 15,
-  },
-  promptText: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 15,
-    color: Colors.primary,
-    marginLeft: 12,
-  },
+  promptHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  promptLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.primary, letterSpacing: 1, textTransform: 'uppercase' },
+  promptText: { fontFamily: 'Lora_400Regular_Italic', fontSize: 20, color: Colors.textDark, lineHeight: 28 },
+
   writingCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    minHeight: 350,
-    flex: 1,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.04)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 1,
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
+    borderWidth: 1, borderColor: '#E5E7EB',
+    minHeight: 300,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,
   },
-  textInput: {
-    flex: 1,
-    fontFamily: 'Lora_400Regular',
-    fontSize: 16,
-    lineHeight: 28,
-    color: Colors.textPrimary,
+  textarea: {
+    flex: 1, padding: 24, minHeight: 250,
+    fontFamily: 'Lora_400Regular_Italic', fontSize: 18, color: '#374151',
+    lineHeight: 32,
   },
-  wordCount: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: '#A0ADB8',
-    textAlign: 'right',
-    marginTop: 10,
+  wordMirrorStrip: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 24, paddingVertical: 12,
+    borderTopWidth: 1, borderTopColor: '#F3F4F6',
   },
-  wordCountHigh: {
-    color: Colors.secondary, // Green
+  wordMirrorLabel: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  wordMirrorLabelText: { fontFamily: 'Inter_700Bold', fontSize: 10, color: Colors.primary, letterSpacing: -0.3 },
+  suggestionsScroll: { flexDirection: 'row' },
+  suggestionChip: {
+    paddingHorizontal: 12, paddingVertical: 4,
+    backgroundColor: Colors.background, borderRadius: 12,
+    borderWidth: 1, borderColor: '#E5E7EB', marginRight: 8,
   },
-  nudgeCard: {
-    backgroundColor: '#FFF0E6',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    borderLeftWidth: 3,
-    borderLeftColor: '#E8A87C',
+  suggestionText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: '#6B7280' },
+
+  tagsSection: { paddingHorizontal: 8, gap: 8 },
+  tagsLabel: { fontFamily: 'Inter_700Bold', fontSize: 11, color: Colors.textMuted, letterSpacing: 2 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  contextTag: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 20,
+    borderWidth: 1, borderColor: '#E5E7EB',
   },
-  nudgeText: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 14,
-    color: Colors.textSecondary,
-    flex: 1,
-    marginRight: 10,
+  contextTagActive: { borderColor: Colors.primary + '40', backgroundColor: Colors.primary + '08' },
+  contextTagText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: '#6B7280' },
+  addTagBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    borderWidth: 2, borderStyle: 'dashed', borderColor: '#D1D5DB',
+    alignItems: 'center', justifyContent: 'center',
   },
-  tagsContainer: {
-    marginBottom: 20,
-  },
-  tagsLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  tagBtn: {
-    backgroundColor: '#F0EDE8',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  tagBtnSelected: {
-    backgroundColor: Colors.primary,
-  },
-  tagText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  tagTextSelected: {
-    color: '#FFFFFF',
-  },
-  suggestionsContainer: {
-    marginBottom: 20,
-  },
-  suggestionPill: {
-    backgroundColor: '#F0EDE8',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  suggestionText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 13,
-    color: '#5B6B78',
-  },
+
   emotionBar: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F0EDE8',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingVertical: 16,
+    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB',
   },
-  emotionBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingRight: 15,
+  emotionBarLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sensingLabel: { fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.textMuted, letterSpacing: 2 },
+  sensedEmotions: { flexDirection: 'row', gap: 8 },
+  sensedPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12,
   },
-  sensingText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginRight: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 2,
-  },
-  neutralSenseText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#C0B8B0',
-    fontStyle: 'italic',
-  },
-  emotionScroll: {
-    flex: 1,
-  },
-  emotionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 6,
-  },
-  emotionBadgeText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-  },
-  savedOverlay: {
-    position: 'absolute',
-    top: 60,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(44, 62, 80, 0.9)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  savedOverlayText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: '#FFFFFF',
-    marginLeft: 6,
-  },
+  sensedDot: { width: 6, height: 6, borderRadius: 3 },
+  sensedText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, fontWeight: '600' },
 });

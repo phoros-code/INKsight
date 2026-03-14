@@ -1,137 +1,105 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Colors } from '../../src/constants/colors';
+import { MaterialIcons } from '@expo/vector-icons';
 
-// Ensure single MMKV instance
-const MMKV_Class = Platform.OS !== 'web' ? require('react-native-mmkv').MMKV : null;
-const storage = MMKV_Class ? new MMKV_Class() : { getString: () => null, getBoolean: () => false, set: () => {} };
-
-const INITIAL_EMOTIONS = [
-  { label: 'Calm', color: Colors.emotionCalm },
-  { label: 'Anxious', color: Colors.emotionAnxious },
-  { label: 'Hopeful', color: Colors.emotionHappy },
-  { label: 'Empty', color: Colors.emotionNeutral },
-  { label: 'Overwhelmed', color: Colors.emotionFear || '#C4A4C0' },
-  { label: 'Grateful', color: Colors.softGreen },
-  { label: 'Tired', color: '#B8A898' },
-  { label: 'Curious', color: Colors.secondary },
-  { label: 'Sad', color: Colors.emotionSad },
+const EMOTIONS = [
+  { name: 'Calm', color: '#7DBFA7' },
+  { name: 'Anxious', color: '#89B4D4' },
+  { name: 'Hopeful', color: '#F0C070' },
+  { name: 'Empty', color: '#A8B8C8' },
+  { name: 'Overwhelmed', color: '#C4A4C0' },
+  { name: 'Grateful', color: '#90C49A' },
+  { name: 'Tired', color: '#B8A898' },
+  { name: 'Curious', color: '#7DBFA7' },
+  { name: 'Sad', color: '#89ABD4' },
 ];
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function EmotionCheckScreen() {
   const router = useRouter();
-  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
-  const [customWord, setCustomWord] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [note, setNote] = useState('');
 
-  const toggleEmotion = (label: string) => {
-    Haptics.selectionAsync();
-    setSelectedEmotions(prev => 
-      prev.includes(label) 
-        ? prev.filter(e => e !== label)
-        : [...prev, label]
+  const toggle = (name: string) => {
+    setSelected(prev =>
+      prev.includes(name) ? prev.filter(e => e !== name) : [...prev, name]
     );
   };
 
-  const handleFinish = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    
-    // Save state
-    const finalSet = [...selectedEmotions];
-    if (customWord.trim()) finalSet.push(customWord.trim());
-    
-    try {
-      storage.set('initial_emotions', JSON.stringify(finalSet));
-      await AsyncStorage.setItem('onboarding_complete', 'true');
-      
-      // Navigate to main app layout
-      router.replace('/(tabs)');
-    } catch (e) {
-      console.error('Failed to save onboarding state', e);
-    }
-  };
-
-  const renderChip = ({ item }: { item: typeof INITIAL_EMOTIONS[0] }) => {
-    const isSelected = selectedEmotions.includes(item.label);
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => toggleEmotion(item.label)}
-        style={[
-          styles.chip,
-          isSelected ? { backgroundColor: item.color, borderColor: item.color } : null
-        ]}
-      >
-        <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>
-          {item.label}
-        </Text>
-      </TouchableOpacity>
-    );
+  const handleStart = async () => {
+    await AsyncStorage.setItem('onboarding_complete', 'true');
+    router.replace('/(tabs)');
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        
-        <View style={styles.header}>
-          <Text style={styles.heading}>Right now, in this moment...</Text>
-          <Text style={styles.subheading}>
-            How would you describe how you feel? (Choose all that apply)
-          </Text>
+    <View style={styles.container}>
+      {/* Top Nav */}
+      <View style={styles.topNav}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <MaterialIcons name="arrow-back" size={28} color={Colors.textMuted} />
+        </TouchableOpacity>
+        <Text style={styles.stepText}>Step 3 of 3</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Watercolor BG hint */}
+        <View style={styles.watercolorBg} />
+
+        <View style={styles.textSection}>
+          <Text style={styles.headline}>Right now, in this moment...</Text>
+          <Text style={styles.subline}>How would you describe how you feel?</Text>
         </View>
 
-        <View style={styles.gridContainer}>
-          {INITIAL_EMOTIONS.map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              activeOpacity={0.7}
-              onPress={() => toggleEmotion(item.label)}
-              style={[
-                styles.chip,
-                selectedEmotions.includes(item.label) ? { backgroundColor: item.color, borderColor: item.color } : null
-              ]}
-            >
-              <Text style={[styles.chipText, selectedEmotions.includes(item.label) && styles.chipTextSelected]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* Emotion Grid */}
+        <View style={styles.grid}>
+          {EMOTIONS.map(em => {
+            const isSelected = selected.includes(em.name);
+            return (
+              <TouchableOpacity
+                key={em.name}
+                style={[
+                  styles.chip,
+                  isSelected && { borderColor: em.color, backgroundColor: em.color + '15' },
+                ]}
+                onPress={() => toggle(em.name)}
+                activeOpacity={0.7}
+              >
+                <Text style={[
+                  styles.chipText,
+                  isSelected && { color: em.color },
+                ]}>{em.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        <View style={styles.inputContainer}>
+        {/* Text Input */}
+        <View style={styles.textInputContainer}>
           <TextInput
-            style={styles.textInput}
-            placeholder="Or describe it in your own words..."
-            placeholderTextColor="#A0ADB8"
-            value={customWord}
-            onChangeText={setCustomWord}
-            returnKeyType="done"
+            style={styles.textarea}
+            placeholder="Add more details about your mood..."
+            placeholderTextColor={Colors.textMuted + '80'}
+            multiline
+            value={note}
+            onChangeText={setNote}
           />
         </View>
-
-        <View style={{ flex: 1 }} />
-
-        <TouchableOpacity style={styles.ctaButton} onPress={handleFinish}>
-          <Text style={styles.ctaText}>Start Reflecting</Text>
-        </TouchableOpacity>
-
-        <View style={styles.progressContainer}>
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-          <View style={[styles.dot, styles.activeDot]} />
-        </View>
-
       </ScrollView>
-    </KeyboardAvoidingView>
+
+      {/* Footer */}
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.primaryButton} onPress={handleStart} activeOpacity={0.9}>
+          <Text style={styles.primaryButtonText}>Start Reflecting</Text>
+        </TouchableOpacity>
+        <View style={styles.progressDots}>
+          <View style={[styles.dot, { backgroundColor: Colors.textMuted, opacity: 0.3 }]} />
+          <View style={[styles.dot, { backgroundColor: Colors.textMuted, opacity: 0.3 }]} />
+          <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -139,94 +107,124 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    maxWidth: 448,
+    alignSelf: 'center',
+    width: '100%',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
-    paddingBottom: 50,
+    paddingBottom: 20,
   },
-  header: {
-    marginBottom: 40,
+  topNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 24,
   },
-  heading: {
+  stepText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  watercolorBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.primary,
+    opacity: 0.03,
+    borderRadius: 200,
+  },
+  textSection: {
+    paddingTop: 16,
+  },
+  headline: {
     fontFamily: 'Nunito_700Bold',
     fontSize: 24,
-    color: Colors.textPrimary,
-    marginBottom: 12,
+    fontWeight: '700',
+    color: Colors.textDark,
+    lineHeight: 32,
   },
-  subheading: {
+  subline: {
     fontFamily: 'Lora_400Regular_Italic',
     fontSize: 15,
-    color: Colors.textSecondary,
-    lineHeight: 22,
+    color: Colors.textMuted,
+    marginTop: 8,
   },
-  gridContainer: {
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 30,
+    gap: 12,
+    marginTop: 32,
   },
   chip: {
-    width: '31%',
-    backgroundColor: '#F0EDE8',
-    borderWidth: 1,
-    borderColor: '#E0DAD3',
-    paddingVertical: 12,
-    borderRadius: 20,
+    height: 40,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: Colors.chipBg,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    minWidth: '30%',
+    flexGrow: 1,
+    maxWidth: '32%',
   },
   chipText: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: '#5B6B78',
+    fontSize: 14,
+    color: Colors.textDark,
   },
-  chipTextSelected: {
-    color: '#FFFFFF',
-    fontFamily: 'Inter_500Medium',
+  textInputContainer: {
+    marginTop: 32,
   },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  textInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E0DAD3',
+  textarea: {
+    width: '100%',
+    height: 128,
+    padding: 16,
     borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderMuted,
+    backgroundColor: '#FFFFFF',
     fontFamily: 'Lora_400Regular',
     fontSize: 15,
-    color: Colors.textPrimary,
+    color: Colors.textDark,
+    textAlignVertical: 'top',
   },
-  ctaButton: {
-    backgroundColor: Colors.primary,
-    height: 56,
+  footer: {
+    paddingHorizontal: 24,
+    paddingBottom: 32,
+    gap: 24,
+  },
+  primaryButton: {
     width: '100%',
-    borderRadius: 30,
-    justifyContent: 'center',
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
     alignItems: 'center',
-    marginBottom: 30,
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  ctaText: {
-    fontFamily: 'Nunito_600SemiBold',
+  primaryButtonText: {
+    fontFamily: 'Nunito_700Bold',
     fontSize: 16,
     color: '#FFFFFF',
+    fontWeight: '700',
   },
-  progressContainer: {
+  progressDots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 8,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#D4DEE8',
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: Colors.primary,
   },
 });

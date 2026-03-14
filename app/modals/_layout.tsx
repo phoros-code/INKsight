@@ -9,13 +9,14 @@ export default function ModalsLayout() {
         headerShown: false,
         animation: 'slide_from_bottom',
         presentation: 'modal',
-        contentStyle: { backgroundColor:Colors.darkBg }
+        contentStyle: { backgroundColor: Colors.background }
       }}
     >
-      <Stack.Screen name="emotion-wheel" />
+      <Stack.Screen name="emotion-wheel" options={{ contentStyle: { backgroundColor: Colors.darkBg } }} />
       <Stack.Screen name="safe-space" options={{ animation: 'fade' }} />
-      <Stack.Screen name="weekly-summary" options={{ animation: 'fade' }} />
+      <Stack.Screen name="weekly-summary" options={{ animation: 'fade', contentStyle: { backgroundColor: Colors.darkBg } }} />
       <Stack.Screen name="grounding" options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="word-mirror" options={{ presentation: 'transparentModal', animation: 'fade' }} />
       <Stack.Screen  
         name="daily-checkin" 
         options={{

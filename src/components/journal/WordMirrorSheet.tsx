@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: 'Nunito_700Bold',
     fontSize: 18,
-    color: Colors.textPrimary,
+    color: Colors.textDark,
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   richerWord: {
     fontFamily: 'Nunito_600SemiBold',
     fontSize: 16,
-    color: Colors.textPrimary,
+    color: Colors.textDark,
     marginBottom: 4,
     textTransform: 'capitalize',
   },

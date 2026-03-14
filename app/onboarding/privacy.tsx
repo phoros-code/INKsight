@@ -1,80 +1,76 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
 import { Colors } from '../../src/constants/colors';
-import { BreathingCircle } from '../../src/components/ui/BreathingCircle';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function PrivacyScreen() {
   const router = useRouter();
 
-  const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/onboarding/emotion-check');
-  };
-
-  const handlePrivacyDetails = () => {
-    // Open a modal later if needed
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
+  const features = [
+    { icon: 'shield' as const, title: 'End-to-end encrypted locally', desc: 'Your private data is never readable by others' },
+    { icon: 'wifi-off' as const, title: '100% offline, always', desc: 'Works without internet or data collection' },
+    { icon: 'fingerprint' as const, title: 'Biometric lock protection', desc: 'Keep your diary safe with FaceID or TouchID' },
+  ];
 
   return (
     <View style={styles.container}>
-      <View style={styles.topSection}>
-        <View style={styles.iconContainer}>
-          <BreathingCircle size={100} color={Colors.secondary} duration={4000} />
-          <Feather name="lock" size={48} color={Colors.secondary} style={styles.lockIcon} />
+      {/* Header with back button and dots */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <MaterialIcons name="arrow-back" size={24} color={Colors.textDark} />
+        </TouchableOpacity>
+        <View style={styles.progressDots}>
+          <View style={[styles.dot, { backgroundColor: Colors.dotInactive }]} />
+          <View style={[styles.dot, { backgroundColor: Colors.primary }]} />
+          <View style={[styles.dot, { backgroundColor: Colors.dotInactive }]} />
         </View>
-        <Text style={styles.heading}>Your words never leave your device.</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.featureList}>
-        <View style={styles.featureRow}>
-          <View style={styles.featureIconBox}>
-            <Feather name="shield" size={20} color={Colors.primary} />
-          </View>
-          <View style={styles.featureTextContainer}>
-            <Text style={styles.featureTitle}>End-to-end encrypted locally</Text>
-            <Text style={styles.featureDesc}>Secured with your biometric data.</Text>
-          </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Hero Icon */}
+        <View style={styles.heroIcon}>
+          <View style={styles.iconGlow} />
+          <MaterialIcons name="lock" size={64} color={Colors.sage} />
         </View>
 
-        <View style={styles.featureRow}>
-          <View style={styles.featureIconBox}>
-            <Feather name="wifi-off" size={20} color={Colors.primary} />
-          </View>
-          <View style={styles.featureTextContainer}>
-            <Text style={styles.featureTitle}>100% offline, always</Text>
-            <Text style={styles.featureDesc}>No clouds, no servers. It lives here.</Text>
-          </View>
+        {/* Content */}
+        <View style={styles.textContent}>
+          <Text style={styles.headline}>Your words never leave your device.</Text>
+          <Text style={styles.description}>
+            INKsight works entirely offline. No account required. No cloud sync. Protected by biometric lock.
+          </Text>
         </View>
 
-        <View style={styles.featureRow}>
-          <View style={styles.featureIconBox}>
-            <Feather name="eye-off" size={20} color={Colors.primary} />
-          </View>
-          <View style={styles.featureTextContainer}>
-            <Text style={styles.featureTitle}>No account. No tracking.</Text>
-            <Text style={styles.featureDesc}>Just open the app and start writing.</Text>
-          </View>
+        {/* Feature Rows */}
+        <View style={styles.featureRows}>
+          {features.map((f, i) => (
+            <View key={i} style={styles.featureRow}>
+              <View style={styles.featureIconBg}>
+                <MaterialIcons name={f.icon} size={18} color={Colors.primary} />
+              </View>
+              <View style={styles.featureText}>
+                <Text style={styles.featureTitle}>{f.title}</Text>
+                <Text style={styles.featureDesc}>{f.desc}</Text>
+              </View>
+            </View>
+          ))}
         </View>
-      </View>
+      </ScrollView>
 
+      {/* Bottom Actions */}
       <View style={styles.bottomSection}>
-        <TouchableOpacity style={styles.secondaryLink} onPress={handlePrivacyDetails}>
-          <Text style={styles.secondaryLinkText}>How does this work?</Text>
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => router.push('/onboarding/emotion-check')}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.primaryButtonText}>I Feel Safe Here</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.ctaButton} onPress={handleNext}>
-          <Text style={styles.ctaText}>I Feel Safe Here</Text>
+        <TouchableOpacity>
+          <Text style={styles.linkText}>How does this work?</Text>
         </TouchableOpacity>
-
-        <View style={styles.progressContainer}>
-          <View style={styles.dot} />
-          <View style={[styles.dot, styles.activeDot]} />
-          <View style={styles.dot} />
-        </View>
       </View>
     </View>
   );
@@ -84,104 +80,135 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    paddingHorizontal: 24,
-    paddingTop: 80,
-    paddingBottom: 50,
-  },
-  topSection: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  lockIcon: {
-    position: 'absolute',
-  },
-  heading: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 26,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    paddingHorizontal: 10,
-    lineHeight: 34,
-  },
-  featureList: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  featureIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.softBlue,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  featureTextContainer: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 16,
-    color: Colors.textPrimary,
-    marginBottom: 4,
-  },
-  featureDesc: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-  },
-  bottomSection: {
-    alignItems: 'center',
-  },
-  secondaryLink: {
-    marginBottom: 24,
-  },
-  secondaryLinkText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 15,
-    color: Colors.textSecondary,
-    textDecorationLine: 'underline',
-  },
-  ctaButton: {
-    backgroundColor: Colors.primary,
-    height: 56,
+    maxWidth: 448,
+    alignSelf: 'center',
     width: '100%',
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
   },
-  ctaText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 16,
-    color: '#FFFFFF',
+  scrollContent: {
+    flexGrow: 1,
   },
-  progressContainer: {
+  header: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 24,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressDots: {
+    flexDirection: 'row',
+    gap: 6,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#D4DEE8',
-    marginHorizontal: 4,
   },
-  activeDot: {
+  heroIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 32,
+    paddingBottom: 40,
+  },
+  iconGlow: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.sage,
+    opacity: 0.15,
+  },
+  textContent: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  headline: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 26,
+    fontWeight: '700',
+    color: Colors.textDark,
+    textAlign: 'center',
+    lineHeight: 34,
+    marginBottom: 12,
+  },
+  description: {
+    fontFamily: 'Lora_400Regular',
+    fontSize: 15,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 25,
+    maxWidth: 300,
+  },
+  featureRows: {
+    marginTop: 40,
+    paddingHorizontal: 24,
+    gap: 16,
+    flex: 1,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 8,
+  },
+  featureIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.accentBlue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: {
+    flex: 1,
+  },
+  featureTitle: {
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textDark,
+  },
+  featureDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    alignItems: 'center',
+    gap: 16,
+  },
+  primaryButton: {
+    width: '100%',
+    height: 56,
+    borderRadius: 30,
     backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  primaryButtonText: {
+    fontFamily: 'Nunito_700Bold',
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  linkText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: Colors.primary,
+    textDecorationLine: 'underline',
   },
 });

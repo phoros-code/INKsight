@@ -1,564 +1,318 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  Switch, Alert, TextInput, Platform 
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { format } from 'date-fns';
-
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, Platform } from 'react-native';
 import { Colors } from '../../src/constants/colors';
-
-// Platform-safe imports
-let useSQLiteContext: any = () => ({ runAsync: async () => {}, getFirstAsync: async () => null, execAsync: async () => {} });
-let MMKV: any = null;
-let Haptics: any = { selectionAsync: () => {}, notificationAsync: () => {}, NotificationFeedbackType: { Success: 0, Warning: 1 } };
-let Sharing: any = { shareAsync: async () => {} };
-let FileSystem: any = { documentDirectory: '', writeAsStringAsync: async () => {} };
-let LocalAuthentication: any = {};
-let getStreakCount: any = async () => 0;
-let seedDemoData: any = async () => {};
-
-if (Platform.OS !== 'web') {
-  useSQLiteContext = require('expo-sqlite').useSQLiteContext;
-  MMKV = require('react-native-mmkv').MMKV;
-  Haptics = require('expo-haptics');
-  Sharing = require('expo-sharing');
-  FileSystem = require('expo-file-system');
-  LocalAuthentication = require('expo-local-authentication');
-  getStreakCount = require('../../src/database/journalDB').getStreakCount;
-  seedDemoData = require('../../src/utils/seedDemoData').seedDemoData;
-}
-
-// Web-safe MMKV mock
-const storage = MMKV ? new MMKV() : {
-  getString: (k: string) => null,
-  getBoolean: (k: string) => false,
-  set: (k: string, v: any) => {},
-};
+import { MaterialIcons } from '@expo/vector-icons';
+import { webStore } from '../../src/database/webDataStore';
+import { seedWebDemoData } from '../../src/utils/seedDemoData';
+import { useTheme, THEMES, ThemeName } from '../../src/constants/ThemeContext';
 
 export default function SettingsScreen() {
-  const router = useRouter();
-  const db = Platform.OS !== 'web' ? useSQLiteContext() : null;
-  
-  // State
-  const [userName, setUserName] = useState('Friend');
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [journalStats, setJournalStats] = useState({ total: 0, firstDate: '', streak: 0 });
-  
-  // Toggles
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [offlineMode, setOfflineMode] = useState(true); // Default true per spec
-  const [darkMode, setDarkMode] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { theme, themeName, setTheme } = useTheme();
+  const [passcodeLock, setPasscodeLock] = useState(true);
+  const [biometrics, setBiometrics] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-    loadStats();
-  }, []);
+  const entryCount = Platform.OS === 'web' ? webStore.getEntryCount() : 0;
+  const streak = Platform.OS === 'web' ? webStore.getStreakCount() : 0;
 
-  const loadSettings = () => {
-    setUserName(storage.getString('user_name') || 'Friend');
-    setBiometricEnabled(storage.getBoolean('biometric_enabled') || false);
-    setOfflineMode(storage.getBoolean('offline_mode') ?? true);
-    setDarkMode(storage.getBoolean('dark_mode') || false);
-    setNotificationsEnabled(storage.getBoolean('notifications_enabled') || false);
-  };
-
-  const loadStats = async () => {
-    if (Platform.OS === 'web' || !db) return;
-    try {
-      const totalRes = await db.getFirstAsync('SELECT COUNT(*) as count FROM journal_entries');
-      const firstRes = await db.getFirstAsync('SELECT date FROM journal_entries ORDER BY date ASC LIMIT 1');
-      const streakValue = await getStreakCount(db);
-      
-      setJournalStats({
-        total: totalRes?.count || 0,
-        firstDate: firstRes?.date ? format(new Date(firstRes.date), 'MMMM yyyy') : 'Just started',
-        streak: streakValue
-      });
-    } catch (e) {
-      console.error('Failed to load stats', e);
-    }
-  };
-
-  const handleNameSave = () => {
-    setIsEditingName(false);
-    storage.set('user_name', userName.trim() || 'Friend');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  // --- Toggle Handlers ---
-
-  const toggleBiometric = async (value: boolean) => {
-    if (value) {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!hasHardware || !isEnrolled) {
-        Alert.alert('Not Available', 'Biometric authentication is not set up on this device.');
-        return;
-      }
-      
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to enable lock',
-      });
-      
-      if (result.success) {
-        setBiometricEnabled(true);
-        storage.set('biometric_enabled', true);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+  const handleLoadDemoData = () => {
+    if (Platform.OS === 'web') {
+      try { localStorage.removeItem('inksight_demo_seeded'); } catch {}
+      webStore.clearAll();
+      seedWebDemoData();
+      setDemoLoaded(true);
+      setTimeout(() => window.location.reload(), 500);
     } else {
-       setBiometricEnabled(false);
-       storage.set('biometric_enabled', false);
+      Alert.alert('Demo Data', 'Demo data loading is only available on web.');
     }
   };
 
-  const toggleOffline = (val: boolean) => {
-    setOfflineMode(val);
-    storage.set('offline_mode', val);
-    if (!val) {
-      Alert.alert('Warning', 'INKsight is designed to be privacy-first. We recommend keeping offline mode ON.');
+  const handleClearData = () => {
+    if (Platform.OS === 'web') {
+      webStore.clearAll();
+      try { localStorage.removeItem('inksight_demo_seeded'); } catch {}
+      setDemoLoaded(false);
+      setTimeout(() => window.location.reload(), 500);
     }
   };
 
-  // --- Actions ---
+  // Dynamic styles based on active theme
+  const bg = theme.background;
+  const cardBg = theme.card;
+  const textMain = theme.textMain;
+  const textMuted = theme.textMuted;
+  const primary = theme.primary;
+  const isDark = theme.isDark;
+  const borderColor = isDark ? '#FFFFFF0D' : '#00000008';
 
-  const handleExportData = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      const entries = await db.getAllAsync('SELECT * FROM journal_entries ORDER BY date DESC');
-      const checkins = await db.getAllAsync('SELECT * FROM daily_checkins ORDER BY date DESC');
-      
-      const exportObject = {
-        exportedAt: new Date().toISOString(),
-        entries,
-        checkins
-      };
+  const settingSections = [
+    {
+      title: 'PRIVACY & SECURITY',
+      items: [
+        { icon: 'lock' as const, label: 'Passcode Lock', type: 'toggle', value: passcodeLock, onToggle: setPasscodeLock },
+        { icon: 'fingerprint' as const, label: 'Face ID / Biometrics', type: 'toggle', value: biometrics, onToggle: setBiometrics },
+      ],
+    },
+    {
+      title: 'YOUR DATA',
+      items: [
+        { icon: 'cloud-upload' as const, label: 'Sync to iCloud', type: 'nav' },
+        { icon: 'file-download' as const, label: 'Export Journal (PDF/CSV)', type: 'nav' },
+      ],
+    },
+  ];
 
-      const fileUri = FileSystem.documentDirectory + `INKsight_Backup_${format(new Date(), 'yyyyMMdd')}.json`;
-      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(exportObject, null, 2));
-
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: 'application/json',
-          dialogTitle: 'Export INKsight Data'
-        });
-      } else {
-        Alert.alert('Sharing not available', 'Unable to export file on this device.');
-      }
-    } catch (e) {
-      Alert.alert('Export Failed', 'Could not export your data.');
-      console.error(e);
-    }
-  };
-
-  const handleDeleteAll = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      'Delete All Data',
-      'This will permanently erase all journal entries, patterns, and settings on this device. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: () => {
-            Alert.prompt('Confirm Deletion', 'Type DELETE to confirm', [
-               { text: 'Cancel', style: 'cancel' },
-               {
-                 text: 'Confirm',
-                 style: 'destructive',
-                 onPress: async (text: string | undefined) => {
-                    if (text === 'DELETE') {
-                      try {
-                        await db.execAsync('DELETE FROM journal_entries; DELETE FROM daily_checkins; DELETE FROM pattern_insights;');
-                        loadStats();
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        Alert.alert('Data Erased', 'Your journal is completely clear.');
-                      } catch(e) {
-                        console.error('Del err', e);
-                      }
-                    } else {
-                      Alert.alert('Cancelled', 'You did not type DELETE. Your data is safe.');
-                    }
-                 }
-               }
-            ]);
-          }
-        }
-      ]
-    );
-  };
-
-  const handleLoadDemoData = async () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      'Load Demo Data',
-      'This will inject 30 days of journal entries and patterns for demo purposes. Proceed?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Load Data', 
-          onPress: async () => {
-            try {
-               await seedDemoData(db);
-               loadStats();
-               Alert.alert('Success', 'Demo data loaded! Check your Home and Insights tabs.');
-            } catch(e) {
-               console.error(e);
-            }
-          }
-        }
-      ]
-    );
-  };
+  const themeOptions: { key: ThemeName; label: string; preview: string; primaryColor: string }[] = [
+    { key: 'sunset', label: 'Sunset Solace', preview: '#F5F2EE', primaryColor: '#E8A87C' },
+    { key: 'midnight', label: 'Midnight Moss', preview: '#1E2A3A', primaryColor: '#7DBFA7' },
+    { key: 'lavender', label: 'Lavender Lullaby', preview: '#F4F0F7', primaryColor: '#9A97C1' },
+  ];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Text style={[styles.pageTitle, { marginBottom: 0 }]}>Settings</Text>
-        <TouchableOpacity onPress={() => router.push('/modals/safe-space')}>
-           <Feather name="heart" size={24} color="#A0ADB8" />
-        </TouchableOpacity>
-      </View>
-
-      {/* PROFILE CARD */}
-      <View style={styles.profileCard}>
-        <TouchableOpacity style={styles.avatar} onPress={() => setIsEditingName(true)}>
-          <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
-        </TouchableOpacity>
-        <View style={styles.profileInfo}>
-           {isEditingName ? (
-             <TextInput
-               style={styles.nameInput}
-               value={userName}
-               onChangeText={setUserName}
-               onBlur={handleNameSave}
-               autoFocus
-               returnKeyType="done"
-               maxLength={15}
-             />
-           ) : (
-             <TouchableOpacity onPress={() => setIsEditingName(true)}>
-               <Text style={styles.userName}>{userName}</Text>
-             </TouchableOpacity>
-           )}
-           <Text style={styles.subText}>Journaling since {journalStats.firstDate}</Text>
-           <Text style={styles.statsText}>{journalStats.total} entries · {journalStats.streak}-day streak</Text>
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={{ width: 40 }} />
+          <Text style={[styles.headerTitle, { color: textMain }]}>Settings</Text>
+          <View style={{ width: 40 }} />
         </View>
-      </View>
 
-      {/* SECTION 1: PRIVACY & SECURITY */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>PRIVACY & SECURITY</Text>
-        <View style={styles.sectionBox}>
-          
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: Colors.primary }]}>
-                <Feather name="lock" size={16} color="#FFFFFF" />
-              </View>
-              <Text style={styles.rowText}>Biometric Lock</Text>
-            </View>
-            <Switch 
-              value={biometricEnabled} 
-              onValueChange={toggleBiometric}
-              trackColor={{ false: '#E0DAD3', true: Colors.secondary }}
-            />
+        {/* User Profile Card */}
+        <View style={[styles.profileCard, { backgroundColor: cardBg, borderColor }]}>
+          <View style={[styles.profileAvatar, { backgroundColor: primary }]}>
+            <Text style={[styles.profileAvatarText, { color: theme.primaryButtonText }]}>V</Text>
           </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: Colors.secondary }]}>
-                <Feather name="smartphone" size={16} color="#FFFFFF" />
-              </View>
-              <Text style={styles.rowText}>Offline Only Mode</Text>
-            </View>
-            <Switch 
-              value={offlineMode} 
-              onValueChange={toggleOffline}
-              trackColor={{ false: '#E0DAD3', true: Colors.secondary }}
-            />
+          <View style={styles.profileInfo}>
+            <Text style={[styles.profileName, { color: textMain }]}>Vala</Text>
+            <Text style={[styles.profileMeta, { color: textMuted }]}>Journaling since March 2025</Text>
+            <Text style={[styles.profileStats, { color: primary }]}>{entryCount} entries · {streak}-day streak</Text>
           </View>
-
+          <MaterialIcons name="chevron-right" size={24} color={textMuted} />
         </View>
-      </View>
 
-      {/* SECTION 2: YOUR DATA */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>YOUR DATA</Text>
-        <View style={styles.sectionBox}>
-          
-          <TouchableOpacity style={styles.row} onPress={handleExportData}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: Colors.secondary }]}>
-                <Feather name="upload" size={16} color="#FFFFFF" />
-              </View>
-              <View>
-                <Text style={styles.rowText}>Export My Journal</Text>
-                <Text style={styles.rowSubtext}>{journalStats.total} entries found</Text>
-              </View>
+        {/* Setting Sections */}
+        {settingSections.map((section, si) => (
+          <View key={si} style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: textMuted }]}>{section.title}</Text>
+            <View style={styles.sectionItems}>
+              {section.items.map((item, ii) => (
+                <View key={ii} style={[styles.settingRow, { backgroundColor: cardBg, borderColor }]}>
+                  <View style={styles.settingLeft}>
+                    <MaterialIcons name={item.icon} size={20} color={textMuted} />
+                    <Text style={[styles.settingLabel, { color: textMain }]}>{item.label}</Text>
+                  </View>
+                  {item.type === 'toggle' && (
+                    <Switch
+                      value={item.value}
+                      onValueChange={item.onToggle}
+                      trackColor={{ false: isDark ? '#4A5568' : '#CBD5E1', true: primary }}
+                      thumbColor="#FFFFFF"
+                    />
+                  )}
+                  {item.type === 'nav' && (
+                    <MaterialIcons name="chevron-right" size={24} color={textMuted} />
+                  )}
+                </View>
+              ))}
             </View>
-            <Feather name="chevron-right" size={20} color="#A0ADB8" />
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-
-          <TouchableOpacity style={styles.row} onPress={handleDeleteAll}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: Colors.accent }]}>
-                <Feather name="trash-2" size={16} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.rowText, { color: Colors.accent }]}>Delete All Data</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#A0ADB8" />
-          </TouchableOpacity>
-
-          <View style={styles.divider} />
-          
-          <TouchableOpacity style={styles.row} onPress={handleLoadDemoData}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: '#7DBFA7' }]}>
-                <Feather name="database" size={16} color="#FFFFFF" />
-              </View>
-              <Text style={styles.rowText}>Load Demo Data (Dev)</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#A0ADB8" />
-          </TouchableOpacity>
-
-        </View>
-      </View>
-
-      {/* SECTION 3: EXPERIENCE */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>EXPERIENCE</Text>
-        <View style={styles.sectionBox}>
-          
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: '#A0ADB8' }]}>
-                <Feather name="moon" size={16} color="#FFFFFF" />
-              </View>
-              <Text style={styles.rowText}>Dark Mode</Text>
-            </View>
-            <Switch 
-              value={darkMode} 
-              onValueChange={v => { setDarkMode(v); storage.set('dark_mode', v); }}
-              trackColor={{ false: '#E0DAD3', true: Colors.secondary }}
-            />
           </View>
+        ))}
 
-          <View style={styles.divider} />
-
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconCircle, { backgroundColor: '#A0ADB8' }]}>
-                <Feather name="bell" size={16} color="#FFFFFF" />
+        {/* EXPERIENCE — Theme Picker */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: textMuted }]}>EXPERIENCE</Text>
+          <View style={styles.sectionItems}>
+            <TouchableOpacity
+              style={[styles.settingRow, { backgroundColor: cardBg, borderColor }]}
+              onPress={() => setShowThemePicker(!showThemePicker)}
+            >
+              <View style={styles.settingLeft}>
+                <MaterialIcons name="palette" size={20} color={textMuted} />
+                <Text style={[styles.settingLabel, { color: textMain }]}>App Theme</Text>
               </View>
-              <Text style={styles.rowText}>Gentle Reminders</Text>
-            </View>
-            <Switch 
-              value={notificationsEnabled} 
-              onValueChange={v => { setNotificationsEnabled(v); storage.set('notifications_enabled', v); }}
-              trackColor={{ false: '#E0DAD3', true: Colors.secondary }}
-            />
+              <View style={styles.navValueRow}>
+                <Text style={[styles.navValueText, { color: primary }]}>{theme.label}</Text>
+                <MaterialIcons
+                  name={showThemePicker ? 'expand-less' : 'expand-more'}
+                  size={24}
+                  color={textMuted}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {/* Theme Picker Expanded */}
+            {showThemePicker && (
+              <View style={[styles.themePickerContainer, { backgroundColor: isDark ? '#1A2535' : '#F8F7F5', borderColor }]}>
+                {themeOptions.map(opt => {
+                  const isActive = themeName === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.themeOption,
+                        { backgroundColor: cardBg, borderColor: isActive ? opt.primaryColor : borderColor },
+                        isActive && { borderWidth: 2 },
+                      ]}
+                      onPress={() => setTheme(opt.key)}
+                      activeOpacity={0.8}
+                    >
+                      {/* Color preview */}
+                      <View style={styles.themePreviewRow}>
+                        <View style={[styles.themeSwatch, { backgroundColor: opt.preview, borderWidth: 1, borderColor: '#00000015' }]} />
+                        <View style={[styles.themeSwatch, { backgroundColor: opt.primaryColor }]} />
+                      </View>
+                      <Text style={[styles.themeOptionLabel, { color: isActive ? opt.primaryColor : textMain }]}>
+                        {opt.label}
+                      </Text>
+                      {isActive && (
+                        <View style={[styles.activeCheck, { backgroundColor: opt.primaryColor }]}>
+                          <MaterialIcons name="check" size={12} color="#FFF" />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
-
         </View>
-      </View>
 
-      {/* CRISIS SUPPORT CARD */}
-      <View style={styles.crisisCard}>
-        <View style={styles.crisisLeftBorder} />
-        <View style={styles.crisisContent}>
-           <Text style={styles.crisisTitle}>💙 You're not alone</Text>
-           <Text style={styles.crisisDesc}>If you're feeling overwhelmed, immediate help is available.</Text>
-           <Text style={styles.helplineText}>iCall Helpline: 9152987821</Text>
-           <Text style={styles.helplineText}>Vandrevala Foundation: 1860-2662-345</Text>
+        {/* Developer Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: textMuted }]}>DEVELOPER</Text>
+          <View style={styles.sectionItems}>
+            <TouchableOpacity style={[styles.settingRow, { backgroundColor: cardBg, borderColor }]} onPress={handleLoadDemoData}>
+              <View style={styles.settingLeft}>
+                <MaterialIcons name="science" size={20} color={primary} />
+                <Text style={[styles.settingLabel, { color: primary }]}>Load Demo Data (Dev)</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color={primary} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.settingRow, { backgroundColor: cardBg, borderColor }]} onPress={handleClearData}>
+              <View style={styles.settingLeft}>
+                <MaterialIcons name="delete-outline" size={20} color="#E07A5F" />
+                <Text style={[styles.settingLabel, { color: '#E07A5F' }]}>Clear All Data</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#E07A5F" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      <Text style={styles.footerText}>INKsight Premium v2.4.1 · Made with care for your mind.</Text>
+        {/* Crisis Support Card */}
+        <View style={[styles.crisisCard, { backgroundColor: isDark ? '#253447' : '#F0F6FB', borderLeftColor: primary }]}>
+          <View style={styles.crisisRow}>
+            <View style={[styles.crisisIcon, { backgroundColor: isDark ? '#1E2A3A' : '#FFFFFFCC' }]}>
+              <MaterialIcons name="favorite" size={24} color={primary} />
+            </View>
+            <View style={styles.crisisContent}>
+              <Text style={[styles.crisisTitle, { color: textMain }]}>You're not alone</Text>
+              <Text style={[styles.crisisDesc, { color: textMuted }]}>
+                Feeling overwhelmed? Connect with trained professionals at the iCall helpline anytime.
+              </Text>
+              <TouchableOpacity style={[styles.crisisBtn, { backgroundColor: primary }]} activeOpacity={0.9}>
+                <Text style={[styles.crisisBtnText, { color: theme.primaryButtonText }]}>Connect to Support</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
 
-    </ScrollView>
+        {/* Version */}
+        <View style={styles.versionSection}>
+          <Text style={[styles.versionText, { color: textMuted }]}>INKSIGHT PREMIUM V2.4.1</Text>
+          <Text style={[styles.versionSub, { color: textMuted + '99' }]}>Made with care for your mind.</Text>
+        </View>
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
+  container: { flex: 1 },
+  scroll: { paddingBottom: 24 },
+
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingTop: 32, paddingBottom: 16,
   },
-  scrollContent: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 100,
-  },
-  pageTitle: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 24,
-    color: '#2C3E50',
-    marginBottom: 20,
-  },
+  headerTitle: { fontFamily: 'Nunito_700Bold', fontSize: 24, fontWeight: '700' },
+
   profileCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    marginHorizontal: 16, padding: 16, borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 4,
-    marginBottom: 32,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
+  profileAvatar: {
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 24,
-    color: '#FFFFFF',
+  profileAvatarText: { fontFamily: 'Nunito_700Bold', fontSize: 24 },
+  profileInfo: { flex: 1 },
+  profileName: { fontFamily: 'Nunito_600SemiBold', fontSize: 18, fontWeight: '600' },
+  profileMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 2 },
+  profileStats: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 4, fontWeight: '500' },
+
+  section: { marginTop: 24, paddingHorizontal: 16 },
+  sectionLabel: {
+    fontFamily: 'Nunito_600SemiBold', fontSize: 13,
+    textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12, paddingHorizontal: 8,
+    fontWeight: '600',
   },
-  profileInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 18,
-    color: '#2C3E50',
-    marginBottom: 4,
-  },
-  nameInput: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 18,
-    color: '#2C3E50',
-    marginBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.primary,
-    padding: 0,
-  },
-  subText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#7F8C8D',
-    marginBottom: 4,
-  },
-  statsText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: Colors.primary,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: '#A0ADB8',
-    letterSpacing: 1.5,
-    marginBottom: 12,
-    paddingHorizontal: 4,
-    textTransform: 'uppercase',
-  },
-  sectionBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    borderRadius: 20,
+  sectionItems: { gap: 8 },
+  settingRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, height: 52, borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 30,
-    elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.03, shadowRadius: 2,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    height: 52,
+  settingLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  settingLabel: { fontFamily: 'Inter_500Medium', fontSize: 15, fontWeight: '500' },
+  navValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  navValueText: { fontFamily: 'Inter_500Medium', fontSize: 13, fontWeight: '500' },
+
+  // Theme Picker
+  themePickerContainer: {
+    borderRadius: 16, padding: 12, gap: 8,
+    borderWidth: 1,
   },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  themeOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12,
+    borderWidth: 1,
   },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  themePreviewRow: { flexDirection: 'row', gap: 4 },
+  themeSwatch: { width: 24, height: 24, borderRadius: 6 },
+  themeOptionLabel: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 14, fontWeight: '600' },
+  activeCheck: {
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
   },
-  rowText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 15,
-    color: '#2C3E50',
-  },
-  rowSubtext: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: '#A0ADB8',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#F5F0EB',
-    marginLeft: 60,
-  },
+
   crisisCard: {
-    flexDirection: 'row',
-    backgroundColor: '#EBF2F9', // Fallback, would be nice with gradient
-    borderRadius: 20,
-    marginTop: 10,
-    marginBottom: 30,
-    overflow: 'hidden',
+    marginHorizontal: 16, marginTop: 24, borderRadius: 16, padding: 20,
+    borderLeftWidth: 4,
   },
-  crisisLeftBorder: {
-    width: 4,
-    backgroundColor: Colors.secondary,
+  crisisRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+  crisisIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2,
   },
-  crisisContent: {
-    flex: 1,
-    padding: 20,
+  crisisContent: { flex: 1 },
+  crisisTitle: { fontFamily: 'Nunito_700Bold', fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  crisisDesc: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 22, marginBottom: 16 },
+  crisisBtn: {
+    paddingHorizontal: 24, paddingVertical: 10,
+    borderRadius: 20, alignSelf: 'flex-start',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4,
   },
-  crisisTitle: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 15,
-    color: '#2C3E50',
-    marginBottom: 6,
-  },
-  crisisDesc: {
-    fontFamily: 'Lora_400Regular',
-    fontSize: 13,
-    color: '#7F8C8D',
-    marginBottom: 12,
-  },
-  helplineText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  footerText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#A0ADB8',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
+  crisisBtnText: { fontFamily: 'Inter_500Medium', fontSize: 14, fontWeight: '500' },
+
+  versionSection: { alignItems: 'center', paddingVertical: 24 },
+  versionText: { fontFamily: 'Inter_500Medium', fontSize: 11, letterSpacing: 2, fontWeight: '500' },
+  versionSub: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
 });

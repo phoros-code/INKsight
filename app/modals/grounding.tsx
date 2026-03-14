@@ -1,225 +1,127 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { Feather } from '@expo/vector-icons';
-import { SafeHaptics as Haptics } from '../../src/utils/webSafe';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-
 import { Colors } from '../../src/constants/colors';
+import { MaterialIcons } from '@expo/vector-icons';
 
-const GROUNDING_STEPS = [
-  { count: 5, sense: 'SEE', icon: 'eye', prompt: "Name 5 things you can SEE right now." },
-  { count: 4, sense: 'TOUCH', icon: 'hand', prompt: "Name 4 things you can TOUCH." },
-  { count: 3, sense: 'HEAR', icon: 'headphones', prompt: "Name 3 things you can HEAR." },
-  { count: 2, sense: 'SMELL', icon: 'wind', prompt: "Name 2 things you can SMELL." },
-  { count: 1, sense: 'TASTE', icon: 'coffee', prompt: "Name 1 thing you can TASTE." }
+const SENSES = [
+  { num: 5, label: 'things you can SEE', icon: 'visibility' as const, color: Colors.safeBlue },
+  { num: 4, label: 'things you can TOUCH', icon: 'touch-app' as const, color: Colors.safeTeal },
+  { num: 3, label: 'things you can HEAR', icon: 'hearing' as const, color: Colors.accent },
+  { num: 2, label: 'things you can SMELL', icon: 'air' as const, color: '#A89FC4' },
+  { num: 1, label: 'thing you can TASTE', icon: 'restaurant' as const, color: Colors.emotionJoy },
 ];
 
-export default function GroundingExercise() {
+export default function GroundingModal() {
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [inputs, setInputs] = useState<string[]>(Array(5).fill(''));
+  const [step, setStep] = useState(0);
+  const [checked, setChecked] = useState<boolean[]>(Array(5).fill(false));
 
-  const stepData = GROUNDING_STEPS[currentStep];
-
-  const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (currentStep < 4) {
-      setCurrentStep(prev => prev + 1);
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Finish and return
-      router.back();
+  const toggleCheck = (i: number) => {
+    const next = [...checked];
+    next[i] = !next[i];
+    setChecked(next);
+    if (next[i] && i < 4) {
+      setTimeout(() => setStep(i + 1), 600);
     }
   };
 
-  const handleTextChange = (text: string) => {
-    const newInputs = [...inputs];
-    newInputs[currentStep] = text;
-    setInputs(newInputs);
-  };
+  const allDone = checked.every(Boolean);
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        
-        {/* HEADER */}
-        <View style={styles.header}>
-           <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
-             <Feather name="x" size={24} color="#A0ADB8" />
-           </TouchableOpacity>
-           
-           <View style={styles.progressRow}>
-             {[0, 1, 2, 3, 4].map(idx => (
-               <View 
-                 key={idx} 
-                 style={[
-                   styles.progressDot, 
-                   idx === currentStep ? styles.progressDotActive : 
-                   idx < currentStep ? styles.progressDotDone : null
-                 ]} 
-               >
-                 <Text style={[
-                   styles.progressText,
-                   (idx <= currentStep) && { color: '#FFFFFF' }
-                 ]}>
-                   {GROUNDING_STEPS[idx].count}
-                 </Text>
-               </View>
-             ))}
-           </View>
-           
-           <View style={{ width: 40 }} /> {/* Spacer matching close button */}
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <MaterialIcons name="arrow-back" size={24} color={Colors.safeTextDark} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>5-4-3-2-1 Grounding</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
-        {/* CONTENT */}
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-           
-           <Animated.View key={currentStep} entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)} style={styles.stepContainer}>
-              <View style={styles.iconCircle}>
-                <Feather name={stepData.icon as any} size={32} color={Colors.primary} />
-              </View>
-              
-              <Text style={styles.promptText}>{stepData.prompt}</Text>
-              
-              <TextInput
-                style={styles.textInput}
-                multiline
-                placeholder="Type here..."
-                placeholderTextColor="#A0ADB8"
-                value={inputs[currentStep]}
-                onChangeText={handleTextChange}
-                autoFocus
-                textAlignVertical="top"
-              />
-           </Animated.View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.intro}>
+          This technique helps you reconnect with the present moment through your five senses.
+        </Text>
 
-        </ScrollView>
+        {/* Sense Steps */}
+        {SENSES.map((sense, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[
+              styles.senseCard,
+              i <= step ? {} : { opacity: 0.4 },
+              checked[i] && { borderColor: sense.color, backgroundColor: sense.color + '08' },
+            ]}
+            onPress={() => i <= step && toggleCheck(i)}
+            activeOpacity={0.8}
+            disabled={i > step}
+          >
+            <View style={[styles.senseIcon, { backgroundColor: sense.color + '15' }]}>
+              <MaterialIcons name={sense.icon} size={24} color={sense.color} />
+            </View>
+            <View style={styles.senseContent}>
+              <Text style={styles.senseNum}>Name {sense.num}</Text>
+              <Text style={styles.senseLabel}>{sense.label}</Text>
+            </View>
+            <View style={[styles.checkbox, checked[i] && { backgroundColor: sense.color, borderColor: sense.color }]}>
+              {checked[i] && <MaterialIcons name="check" size={14} color="#FFF" />}
+            </View>
+          </TouchableOpacity>
+        ))}
 
-        {/* BOTTOM NAV */}
-        <View style={styles.bottomNav}>
-           <TouchableOpacity 
-             style={[styles.nextBtn, inputs[currentStep].trim() === '' && { opacity: 0.5 }]} 
-             onPress={handleNext}
-             disabled={inputs[currentStep].trim() === ''}
-           >
-             <Text style={styles.nextBtnText}>
-                {currentStep === 4 ? "Complete" : "Next"}
-             </Text>
-             <Feather name={currentStep === 4 ? "check" : "chevron-right"} size={20} color="#FFFFFF" />
-           </TouchableOpacity>
-        </View>
-
-      </KeyboardAvoidingView>
+        {allDone && (
+          <View style={styles.doneCard}>
+            <MaterialIcons name="spa" size={48} color={Colors.safeTeal} />
+            <Text style={styles.doneTitle}>Well done 🌿</Text>
+            <Text style={styles.doneDesc}>You've completed the grounding exercise. Take a moment.</Text>
+            <TouchableOpacity style={styles.doneBtn} onPress={() => router.back()} activeOpacity={0.9}>
+              <Text style={styles.doneBtnText}>Return to Safe Space</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F8FA',
-  },
+  container: { flex: 1, backgroundColor: '#F0F6FB' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  closeBtn: {
-    padding: 8,
-    width: 40,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  progressDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EBF2F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressDotActive: {
-    backgroundColor: Colors.primary,
-    transform: [{ scale: 1.1 }],
-  },
-  progressDotDone: {
-    backgroundColor: Colors.secondary,
-  },
-  progressText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: '#A0ADB8',
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-  },
-  stepContainer: {
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  promptText: {
-    fontFamily: 'Nunito_700Bold',
-    fontSize: 24,
-    color: '#2C3E50',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 34,
-  },
-  textInput: {
-    backgroundColor: '#FFFFFF',
-    width: '100%',
-    minHeight: 120,
-    borderRadius: 20,
-    padding: 20,
-    fontFamily: 'Lora_400Regular',
-    fontSize: 16,
-    color: '#2C3E50',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  bottomNav: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
   },
-  nextBtn: {
-    flexDirection: 'row',
-    backgroundColor: Colors.primary,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
+  headerTitle: { fontFamily: 'Nunito_700Bold', fontSize: 20, color: Colors.safeTextDark, fontWeight: '700' },
+  scroll: { paddingHorizontal: 24, paddingBottom: 40, gap: 16 },
+  intro: {
+    fontFamily: 'Lora_400Regular', fontSize: 15, color: Colors.safeTextMuted,
+    lineHeight: 24, marginBottom: 8,
   },
-  nextBtnText: {
-    fontFamily: 'Nunito_600SemiBold',
-    fontSize: 16,
-    color: '#FFFFFF',
+  senseCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
+    borderWidth: 2, borderColor: 'transparent',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4,
   },
+  senseIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  senseContent: { flex: 1 },
+  senseNum: { fontFamily: 'Nunito_700Bold', fontSize: 16, color: Colors.safeTextDark, fontWeight: '700' },
+  senseLabel: { fontFamily: 'Inter_400Regular', fontSize: 13, color: Colors.safeTextMuted, marginTop: 2 },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 2, borderColor: '#CBD5E1',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  doneCard: {
+    alignItems: 'center', gap: 16, marginTop: 24, padding: 32,
+    backgroundColor: '#FFFFFF', borderRadius: 20,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 12,
+  },
+  doneTitle: { fontFamily: 'Nunito_700Bold', fontSize: 24, color: Colors.safeTextDark, fontWeight: '700' },
+  doneDesc: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Colors.safeTextMuted, textAlign: 'center' },
+  doneBtn: {
+    backgroundColor: Colors.safeTeal, paddingHorizontal: 32, paddingVertical: 14,
+    borderRadius: 20, marginTop: 8,
+  },
+  doneBtnText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: '#FFF', fontWeight: '700' },
 });
