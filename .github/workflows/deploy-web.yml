@@ -47,6 +47,9 @@ jobs:
           EXPO_WEB_BUILD: "true"
           EXPO_NO_TELEMETRY: "true"
 
+      - name: SPA Routing Fix
+        run: cp dist/index.html dist/404.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
