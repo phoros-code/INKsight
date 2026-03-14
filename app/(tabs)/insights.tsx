@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform, Share, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Colors } from '../../src/constants/colors';
 import { useTheme } from '../../src/constants/ThemeContext';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -141,6 +142,7 @@ function radarGridPolygon(cx: number, cy: number, r: number): string {
 
 export default function InsightsScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
   const [period, setPeriod] = useState('7 Days');
   const [topEmotions, setTopEmotions] = useState<any[]>([]);
   const [patterns, setPatterns] = useState<any[]>([]);
@@ -237,7 +239,7 @@ export default function InsightsScreen() {
     ` : '<p style="color:#94A3B8;text-align:center;">No chart data available for this period.</p>';
 
     // Build radar SVG
-    const rCx = 130, rCy = 120, rR = 80;
+    const rCx = 170, rCy = 150, rR = 80;
     const radarAxes = ['joy', 'calm', 'gratitude', 'energy', 'anxiety', 'sadness'];
     const radarLabelsArr = ['JOY', 'CALM', 'GRATITUDE', 'ENERGY', 'ANXIETY', 'SADNESS'];
     const radarPts = radarPolygon(radarData, rCx, rCy, rR);
@@ -250,8 +252,8 @@ export default function InsightsScreen() {
     }).join('');
     const labelSvgs = radarLabelsArr.map((label, i) => {
       const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
-      const lx = rCx + Math.cos(angle) * (rR + 22);
-      const ly = rCy + Math.sin(angle) * (rR + 22);
+      const lx = rCx + Math.cos(angle) * (rR + 30);
+      const ly = rCy + Math.sin(angle) * (rR + 30);
       const anchor = i === 0 || i === 3 ? 'middle' : i < 3 ? 'start' : 'end';
       return `<text x="${lx}" y="${ly + 4}" text-anchor="${anchor}" font-size="10" font-weight="600" fill="#64748B" font-family="sans-serif">${label}</text>`;
     }).join('');
@@ -264,7 +266,7 @@ export default function InsightsScreen() {
     }).join('');
 
     const radarSvg = `
-      <svg width="280" height="260" viewBox="0 0 260 240" style="display:block;margin:0 auto;">
+      <svg width="340" height="300" viewBox="0 0 340 300" style="display:block;margin:0 auto;">
         <polygon points="${gridOuter}" fill="none" stroke="#E5E7EB" stroke-width="1" />
         <polygon points="${gridMid}" fill="none" stroke="#F3F4F6" stroke-width="1" />
         <polygon points="${gridInner}" fill="none" stroke="#F9FAFB" stroke-width="1" />
@@ -435,25 +437,29 @@ export default function InsightsScreen() {
     </html>
     `;
 
-    // Open in new window
+    // Open in new window and auto-trigger print for PDF save
     const reportWindow = window.open('', '_blank', 'width=850,height=1100');
     if (reportWindow) {
       reportWindow.document.write(reportHtml);
       reportWindow.document.close();
+      // Auto-trigger Print/Save-as-PDF after fonts load
+      setTimeout(() => {
+        try { reportWindow.print(); } catch {}
+      }, 1500);
     } else {
       alert('Please allow pop-ups to generate the PDF report.');
     }
   };
 
   const RADAR_LABELS = ['Joy', 'Calm', 'Gratitude', 'Energy', 'Anxiety', 'Sadness'];
-  const cx = 130, cy = 120, r = 80;
+  const cx = 170, cy = 150, r = 80;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.headerBtn}>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/' as any)}>
             <MaterialIcons name="arrow-back" size={24} color={theme.textMain} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.textMain }]}>Your Patterns</Text>
@@ -485,7 +491,7 @@ export default function InsightsScreen() {
             </View>
           </View>
           <View style={styles.chartArea}>
-            <Svg width="100%" height={150} viewBox="0 0 400 150" preserveAspectRatio="xMidYMid meet">
+            <Svg width="100%" height={180} viewBox="0 0 400 150" preserveAspectRatio="none">
               <Defs>
                 <LinearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
                   <Stop offset="0%" stopColor={theme.primary} stopOpacity={0.25} />
@@ -494,7 +500,7 @@ export default function InsightsScreen() {
               </Defs>
               {/* Grid lines */}
               {[0.25, 0.5, 0.75].map((frac, i) => (
-                <Line key={i} x1={20} y1={10 + (150 - 20) * frac} x2={380} y2={10 + (150 - 20) * frac} stroke={theme.isDark ? '#FFFFFF08' : '#0000000A'} strokeWidth={1} />
+                <Line key={i} x1={0} y1={10 + (150 - 20) * frac} x2={400} y2={10 + (150 - 20) * frac} stroke={theme.isDark ? '#FFFFFF08' : '#0000000A'} strokeWidth={1} />
               ))}
               {chartData.fill ? <Path d={chartData.fill} fill="url(#chartFill)" /> : null}
               {chartData.line ? <Path d={chartData.line} fill="none" stroke={theme.primary} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" /> : null}
@@ -511,7 +517,7 @@ export default function InsightsScreen() {
         <View style={[styles.sectionCard, { backgroundColor: theme.card, borderColor: theme.isDark ? '#FFFFFF0D' : '#0000000D' }]}>
           <Text style={[styles.sectionTitle, { color: theme.textMain }]}>Emotion Mix</Text>
           <View style={styles.radarContainer}>
-            <Svg width={260} height={260} viewBox="0 0 260 240">
+            <Svg width={340} height={300} viewBox="0 0 340 300">
               {/* Grid rings */}
               <Polygon points={radarGridPolygon(cx, cy, r)} fill="none" stroke={theme.isDark ? '#FFFFFF15' : '#E5E7EB'} strokeWidth={1} />
               <Polygon points={radarGridPolygon(cx, cy, r * 0.66)} fill="none" stroke={theme.isDark ? '#FFFFFF10' : '#F3F4F6'} strokeWidth={1} />
@@ -527,17 +533,17 @@ export default function InsightsScreen() {
               {['joy', 'calm', 'gratitude', 'energy', 'anxiety', 'sadness'].map((a, i) => {
                 const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
                 const val = radarData[a] || 0.15;
-                const x = cx + Math.cos(angle) * r * val;
-                const y = cy + Math.sin(angle) * r * val;
-                return <Circle key={a} cx={x} cy={y} r={4} fill={theme.primary} stroke="#FFF" strokeWidth={2} />;
+                const dotX = cx + Math.cos(angle) * r * val;
+                const dotY = cy + Math.sin(angle) * r * val;
+                return <Circle key={a} cx={dotX} cy={dotY} r={4} fill={theme.primary} stroke="#FFF" strokeWidth={2} />;
               })}
               {/* Labels */}
               {RADAR_LABELS.map((label, i) => {
                 const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
-                const lx = cx + Math.cos(angle) * (r + 22);
-                const ly = cy + Math.sin(angle) * (r + 22);
+                const lx = cx + Math.cos(angle) * (r + 30);
+                const ly = cy + Math.sin(angle) * (r + 30);
                 const anchor = i === 0 || i === 3 ? 'middle' : i < 3 ? 'start' : 'end';
-                return <SvgText key={i} x={lx} y={ly + 4} textAnchor={anchor} fontSize={11} fontWeight="600" fill={theme.textMuted}>{label.toUpperCase()}</SvgText>;
+                return <SvgText key={i} x={lx} y={ly + 4} textAnchor={anchor} fontSize={12} fontWeight="600" fill={theme.textMuted}>{label.toUpperCase()}</SvgText>;
               })}
             </Svg>
           </View>
