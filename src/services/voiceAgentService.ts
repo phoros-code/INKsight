@@ -128,17 +128,13 @@ export async function detectEmotion(text: string): Promise<string> {
 }
 
 /**
- * Generate an empathetic AI response given text, detected emotion, and conversation history.
+ * Generate an empathetic AI response given text and detected emotion.
  */
-export async function generateResponse(
-  text: string,
-  emotion: string,
-  history?: { role: string; text: string }[]
-): Promise<string> {
+export async function generateResponse(text: string, emotion: string): Promise<string> {
   const response = await fetchWithTimeout(`${BASE_URL}/generate-response`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, emotion, history: history || [] }),
+    body: JSON.stringify({ text, emotion }),
   });
 
   const result = await handleResponse<ResponseResult>(response);

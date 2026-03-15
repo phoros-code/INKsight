@@ -7,7 +7,6 @@ import {
   ScrollView,
   Platform,
   Alert,
-  useWindowDimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -33,19 +32,13 @@ export default function VoiceAgentScreen() {
   const router = useRouter();
   const { theme } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
   const [orbState, setOrbState] = useState<OrbState>('idle');
   const [statusText, setStatusText] = useState('Tap the orb to speak');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
-  const [isThinking, setIsThinking] = useState(false);
   const recordingRef = useRef<any>(null);
-
-  // Responsive flags
-  const isNarrow = screenWidth < 480;
-  const isShort = screenHeight < 600;
 
   // Auto-scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
@@ -68,15 +61,6 @@ export default function VoiceAgentScreen() {
   React.useEffect(() => {
     checkServer();
   }, [checkServer]);
-
-  // ── Build conversation history for context ────────────────
-  const getConversationHistory = useCallback(() => {
-    // Send the last 6 messages for context
-    return messages.slice(-6).map(m => ({
-      role: m.sender === 'user' ? 'user' : 'assistant',
-      text: m.text,
-    }));
-  }, [messages]);
 
   // ── Add message helper ───────────────────────────────────
   const addMessage = useCallback((text: string, sender: 'user' | 'sage', emotion?: string) => {
@@ -189,7 +173,7 @@ export default function VoiceAgentScreen() {
       try {
         transcription = await VoiceAgent.transcribeAudio(uri);
       } catch (e: any) {
-        setStatusText(`Error: ${e.message ? e.message.substring(0, 40) : 'Transcription failed'}`);
+        setStatusText('Transcription failed. Try again.');
         setOrbState('idle');
         return;
       }
@@ -240,19 +224,14 @@ export default function VoiceAgentScreen() {
         console.warn('Failed to save voice journal to DB', e);
       }
 
-      // ── 4. Generate response (with history) ───────────────
+      // ── 4. Generate response ─────────────────────────────
       setStatusText('Sage is thinking...');
-      setIsThinking(true);
-      scrollToBottom();
-
       let aiResponse: string;
       try {
-        const history = getConversationHistory();
-        aiResponse = await VoiceAgent.generateResponse(transcription, emotion, history);
+        aiResponse = await VoiceAgent.generateResponse(transcription, emotion);
       } catch (e: any) {
         aiResponse = "I hear you. I'm having trouble finding the right words right now, but I'm here.";
       }
-      setIsThinking(false);
 
       addMessage(aiResponse, 'sage', emotion);
 
@@ -278,7 +257,7 @@ export default function VoiceAgentScreen() {
           return; // Don't set idle yet, wait for playback
         } else {
           // Native Web Audio playback
-          const audio = new window.Audio(audioUri);
+          const audio = new Audio(audioUri);
           
           audio.onended = () => {
             setOrbState('idle');
@@ -305,7 +284,6 @@ export default function VoiceAgentScreen() {
       console.error('Processing error:', error);
       setStatusText('Something went wrong. Try again.');
       setOrbState('idle');
-      setIsThinking(false);
     }
   };
 
@@ -320,7 +298,7 @@ export default function VoiceAgentScreen() {
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>  
       {/* Header */}
-      <View style={[styles.header, isNarrow && styles.headerNarrow]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <MaterialIcons name="close" size={24} color={textMain} />
         </TouchableOpacity>
@@ -345,14 +323,14 @@ export default function VoiceAgentScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.transcriptArea}
-        contentContainerStyle={[styles.transcriptContent, isNarrow && styles.transcriptContentNarrow]}
+        contentContainerStyle={styles.transcriptContent}
         showsVerticalScrollIndicator={false}
       >
         {messages.length === 0 && (
           <View style={styles.emptyState}>
-            <MaterialIcons name="record-voice-over" size={isNarrow ? 36 : 48} color={textMuted + '40'} />
-            <Text style={[styles.emptyTitle, { color: textMuted }, isNarrow && { fontSize: 18 }]}>Talk to Sage</Text>
-            <Text style={[styles.emptySubtitle, { color: textMuted + '99' }, isNarrow && { fontSize: 13, paddingHorizontal: 16 }]}>
+            <MaterialIcons name="record-voice-over" size={48} color={textMuted + '40'} />
+            <Text style={[styles.emptyTitle, { color: textMuted }]}>Talk to Sage</Text>
+            <Text style={[styles.emptySubtitle, { color: textMuted + '99' }]}>
               Your AI emotional support companion.{'\n'}Tap the orb below to start a conversation.
             </Text>
           </View>
@@ -360,24 +338,10 @@ export default function VoiceAgentScreen() {
         {messages.map(msg => (
           <TranscriptBubble key={msg.id} text={msg.text} sender={msg.sender} emotion={msg.emotion} theme={theme} />
         ))}
-
-        {/* Typing indicator */}
-        {isThinking && (
-          <View style={styles.thinkingWrapper}>
-            <View style={[styles.thinkingBubble, { backgroundColor: isDark ? '#FFFFFF0D' : '#F0F4F8', borderColor: isDark ? '#FFFFFF15' : '#E2E8F0' }]}>
-              <Text style={[styles.thinkingText, { color: textMuted }]}>Sage is thinking</Text>
-              <View style={styles.dotsRow}>
-                <View style={[styles.dot, { backgroundColor: primary, opacity: 0.4 }]} />
-                <View style={[styles.dot, { backgroundColor: primary, opacity: 0.6 }]} />
-                <View style={[styles.dot, { backgroundColor: primary, opacity: 0.9 }]} />
-              </View>
-            </View>
-          </View>
-        )}
       </ScrollView>
 
       {/* Orb & controls */}
-      <View style={[styles.controlArea, { backgroundColor: isDark ? cardBg : '#F8FAFC' }, isShort && styles.controlAreaCompact]}>
+      <View style={[styles.controlArea, { backgroundColor: isDark ? cardBg : '#F8FAFC' }]}>
         <Text style={[styles.statusText, { color: textMuted }]}>{statusText}</Text>
         <TouchableOpacity
           onPress={handleOrbPress}
@@ -387,11 +351,9 @@ export default function VoiceAgentScreen() {
         >
           <VoiceOrb state={orbState} primaryColor={primary} />
         </TouchableOpacity>
-        {!isShort && (
-          <Text style={[styles.hintText, { color: textMuted + '80' }]}>
-            {orbState === 'idle' ? 'Sage listens, understands, and responds' : ''}
-          </Text>
-        )}
+        <Text style={[styles.hintText, { color: textMuted + '80' }]}>
+          {orbState === 'idle' ? 'Sage listens, understands, and responds' : ''}
+        </Text>
       </View>
     </View>
   );
@@ -409,11 +371,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'web' ? 16 : 52,
     paddingBottom: 12,
-  },
-  headerNarrow: {
-    paddingHorizontal: 10,
-    paddingTop: Platform.OS === 'web' ? 10 : 44,
-    paddingBottom: 8,
   },
   backBtn: {
     width: 40,
@@ -453,10 +410,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     flexGrow: 1,
   },
-  transcriptContentNarrow: {
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-  },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -488,10 +441,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  controlAreaCompact: {
-    paddingTop: 8,
-    paddingBottom: Platform.OS === 'web' ? 16 : 24,
-  },
   statusText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
@@ -505,34 +454,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
     marginTop: 4,
-  },
-  // Typing indicator styles
-  thinkingWrapper: {
-    alignSelf: 'flex-start',
-    marginVertical: 6,
-  },
-  thinkingBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 18,
-    borderBottomLeftRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    gap: 8,
-  },
-  thinkingText: {
-    fontFamily: 'Lora_400Regular_Italic',
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 3,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
   },
 });

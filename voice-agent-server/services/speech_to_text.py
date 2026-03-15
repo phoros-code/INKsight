@@ -32,10 +32,9 @@ def convert_audio_with_ffmpeg(input_path, output_path):
     ]
     
     try:
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
-    except subprocess.CalledProcessError as e:
-        print("FFmpeg error:", e)
+    except subprocess.CalledProcessError:
         return False
 
 def transcribe_audio(file_path):
@@ -60,7 +59,7 @@ def transcribe_audio(file_path):
         transcription_file = file_path
     
     try:
-        result = model.transcribe(transcription_file, fp16=False)
+        result = model.transcribe(transcription_file)
         return result["text"]
     except Exception as e:
         raise RuntimeError(f"Failed to transcribe audio: {e}")
