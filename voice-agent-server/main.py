@@ -7,6 +7,7 @@ FastAPI backend wrapping the voice agent pipeline:
 import os
 import uuid
 import shutil
+from typing import Optional, List
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
@@ -65,9 +66,14 @@ class TextInput(BaseModel):
 class EmotionInput(BaseModel):
     text: str
 
+class HistoryMessage(BaseModel):
+    role: str
+    text: str
+
 class ResponseInput(BaseModel):
     text: str
     emotion: str
+    history: Optional[List[HistoryMessage]] = []
 
 class TranscriptionResult(BaseModel):
     text: str
@@ -136,7 +142,9 @@ async def generate_response_endpoint(input: ResponseInput):
     if response_generator is None:
         raise HTTPException(status_code=503, detail="Response generator service not available")
     
-    response = response_generator.generate_response(input.text, input.emotion)
+    # Convert history to list of dicts for the generator
+    history = [{"role": h.role, "text": h.text} for h in (input.history or [])]
+    response = response_generator.generate_response(input.text, input.emotion, history)
     return ResponseResult(response=response)
 
 

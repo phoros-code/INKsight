@@ -1,0 +1,1 @@
+{"detail":"Transcription failed: Failed to convert audio file: audio/upload_44c24ba553e744b1ab862ef8e13bcc82.wav"}

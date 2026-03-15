@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 
 interface TranscriptBubbleProps {
   text: string;
@@ -14,18 +14,46 @@ interface TranscriptBubbleProps {
   };
 }
 
+const EMOTION_EMOJI: Record<string, string> = {
+  joy: '😊',
+  sadness: '😢',
+  anger: '😤',
+  fear: '😰',
+  disgust: '🤢',
+  surprise: '😮',
+  neutral: '🤍',
+};
+
+const EMOTION_COLOR: Record<string, string> = {
+  joy: '#F0C070',
+  sadness: '#89ABD4',
+  anger: '#D4896A',
+  fear: '#C4A4C0',
+  disgust: '#A8B8B0',
+  surprise: '#F0B87C',
+  neutral: '#A8B8C8',
+};
+
 export default function TranscriptBubble({ text, sender, emotion, theme }: TranscriptBubbleProps) {
   const isUser = sender === 'user';
+  const { width } = useWindowDimensions();
+  const isNarrow = width < 480;
+  const maxBubbleWidth = isNarrow ? '92%' : '80%';
+
+  const emotionEmoji = emotion ? (EMOTION_EMOJI[emotion] || '🤍') : '';
+  const emotionColor = emotion ? (EMOTION_COLOR[emotion] || EMOTION_COLOR.neutral) : theme.primary;
 
   return (
-    <View style={[styles.wrapper, isUser ? styles.userWrapper : styles.sageWrapper]}>
+    <View style={[styles.wrapper, { maxWidth: maxBubbleWidth }, isUser ? styles.userWrapper : styles.sageWrapper]}>
       {!isUser && (
         <View style={styles.sageHeader}>
-          <View style={[styles.sageDot, { backgroundColor: theme.primary }]} />
-          <Text style={[styles.sageName, { color: theme.primary }]}>Sage</Text>
+          <View style={[styles.sageDot, { backgroundColor: emotionColor }]} />
+          <Text style={[styles.sageName, { color: emotionColor }]}>Sage</Text>
           {emotion && (
-            <View style={[styles.emotionBadge, { backgroundColor: theme.primary + '15' }]}>
-              <Text style={[styles.emotionText, { color: theme.primary }]}>{emotion}</Text>
+            <View style={[styles.emotionBadge, { backgroundColor: emotionColor + '20' }]}>
+              <Text style={[styles.emotionText, { color: emotionColor }]}>
+                {emotionEmoji} {emotion}
+              </Text>
             </View>
           )}
         </View>
@@ -55,7 +83,8 @@ export default function TranscriptBubble({ text, sender, emotion, theme }: Trans
 const styles = StyleSheet.create({
   wrapper: {
     marginVertical: 6,
-    maxWidth: '85%',
+    flexShrink: 1,
+    minWidth: 60,
   },
   userWrapper: {
     alignSelf: 'flex-end',
@@ -69,6 +98,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 4,
     marginLeft: 4,
+    flexWrap: 'wrap',
   },
   sageDot: {
     width: 8,
@@ -81,13 +111,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emotionBadge: {
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
   },
   emotionText: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '500',
     textTransform: 'capitalize',
   },
@@ -96,6 +126,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
+    flexShrink: 1,
   },
   userBubble: {
     borderBottomRightRadius: 4,
@@ -106,6 +137,8 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 22,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   userText: {
     fontFamily: 'Inter_400Regular',
