@@ -32,7 +32,7 @@ def convert_audio_with_ffmpeg(input_path, output_path):
     ]
     
     try:
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except subprocess.CalledProcessError as e:
         print("FFmpeg error:", e)

@@ -46,3 +46,9 @@ voice-agent-server/__pycache__/
 voice-agent-server/audio/
 voice-agent-server/.env
 voice-agent-server/services/__pycache__/
+
+# Debug / scratch files (not part of the project)
+/*.webm
+/test_*.py
+/resp_*.txt
+/transcribe_err*.txt
